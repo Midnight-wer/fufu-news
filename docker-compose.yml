@@ -1,0 +1,54 @@
+# ============================================================
+# fufu新闻 — Docker Compose 编排
+# ============================================================
+# 启动：docker-compose up -d
+# 查看日志：docker-compose logs -f
+# 停止：docker-compose down
+# ============================================================
+
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: fufu-backend
+    ports:
+      - "8800:8800"
+    volumes:
+      - fufu-data:/app/data
+    environment:
+      - APP_NAME=fufu新闻
+      - DATABASE_URL=sqlite+aiosqlite:////app/data/fufu.db
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - AI_API_KEY=${AI_API_KEY:-}
+      - AI_BACKEND=${AI_BACKEND:-deepseek}
+      - AI_BASE_URL=${AI_BASE_URL:-https://api.deepseek.com/v1/chat/completions}
+      - AI_MODEL=${AI_MODEL:-deepseek-chat}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8800/api/v1/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: fufu-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  fufu-data:
+    driver: local

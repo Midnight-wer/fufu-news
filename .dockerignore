@@ -1,0 +1,18 @@
+# ============================================================
+# fufu新闻 — Docker 忽略文件
+# ============================================================
+node_modules
+.venv
+__pycache__
+*.pyc
+.git
+.idea
+.vscode
+*.db
+*.db-shm
+*.db-wal
+*.log
+.env
+.env.local
+dist
+.next

@@ -1,0 +1,115 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  theme: {
+    extend: {
+      colors: {
+        // ===== 主题自适应颜色（通过 CSS 变量切换 miku / milktea / dark） =====
+        fufu: {
+          // 主色系（Miku: 青绿 teal, MilkTea: 奶咖 brown）
+          pink: 'rgb(var(--fufu-pink) / <alpha-value>)',
+          'pink-light': 'rgb(var(--fufu-pink-light) / <alpha-value>)',
+          'pink-soft': 'rgb(var(--fufu-pink-soft) / <alpha-value>)',
+          peach: 'rgb(var(--fufu-peach) / <alpha-value>)',
+          'peach-light': 'rgb(var(--fufu-peach-light) / <alpha-value>)',
+          lavender: 'rgb(var(--fufu-lavender) / <alpha-value>)',
+          'lavender-light': 'rgb(var(--fufu-lavender-light) / <alpha-value>)',
+          // 主色
+          teal: 'rgb(var(--fufu-teal) / <alpha-value>)',
+          'teal-light': 'rgb(var(--fufu-teal-light) / <alpha-value>)',
+          'teal-soft': 'rgb(var(--fufu-teal-soft) / <alpha-value>)',
+          'teal-deep': 'rgb(var(--fufu-teal-deep) / <alpha-value>)',
+          // 背景
+          cream: 'rgb(var(--fufu-cream) / <alpha-value>)',
+          'cream-soft': 'rgb(var(--fufu-cream-soft) / <alpha-value>)',
+          // 状态色
+          mint: 'rgb(var(--fufu-mint) / <alpha-value>)',
+          'mint-light': 'rgb(var(--fufu-mint-light) / <alpha-value>)',
+          'error': 'rgb(var(--fufu-error) / <alpha-value>)',
+          'error-light': 'rgb(var(--fufu-error-light) / <alpha-value>)',
+          highlight: 'rgb(var(--fufu-highlight) / <alpha-value>)',
+          // 文字
+          text: 'rgb(var(--fufu-text) / <alpha-value>)',
+          'text-light': 'rgb(var(--fufu-text-light) / <alpha-value>)',
+          'text-muted': 'rgb(var(--fufu-text-muted) / <alpha-value>)',
+          // 辅助
+          white: 'rgb(var(--fufu-white) / <alpha-value>)',
+          'warm-gray': 'rgb(var(--fufu-warm-gray) / <alpha-value>)',
+          'soft-blue': 'rgb(var(--fufu-soft-blue) / <alpha-value>)',
+          'soft-yellow': 'rgb(var(--fufu-soft-yellow) / <alpha-value>)',
+          'soft-green': 'rgb(var(--fufu-soft-green) / <alpha-value>)',
+          'soft-purple': 'rgb(var(--fufu-soft-purple) / <alpha-value>)',
+        },
+        // ===== 温柔奶咖风 专用颜色（不随主题切换） =====
+        milktea: {
+          'milk-tea': '#C4A77D',
+          'milk-tea-light': '#D4C4A8',
+          'milk-tea-soft': '#EDE4D8',
+          'peach': '#FFB5BA',
+          'peach-light': '#FFD0D5',
+          'peach-soft': '#FFE8EA',
+          'matcha': '#7BA05B',
+          'matcha-light': '#A8C98A',
+          'coral': '#FF8C69',
+          'coral-light': '#FFB099',
+          'cream-bg': '#FAF8F5',
+          'milk-white': '#FFFCF9',
+          'text-brown': '#3D3530',
+          'text-brown-light': '#8B8680',
+          'divider': '#EDE8E0',
+        },
+      },
+      fontFamily: {
+        cute: ['"ZCOOL KuaiLe"', 'cursive'],
+        body: ['"Noto Sans SC"', 'sans-serif'],
+      },
+      borderRadius: {
+        'fufu': 'var(--fufu-radius)',
+        'fufu-card': 'var(--fufu-radius-card)',
+        'fufu-input': 'var(--fufu-radius-input)',
+        'fufu-btn': 'var(--fufu-radius-btn)',
+        'fufu-tag': 'var(--fufu-radius-tag)',
+        'fufu-img': 'var(--fufu-radius-img)',
+        'fufu-modal': 'var(--fufu-radius-modal)',
+        'fufu-toast': 'var(--fufu-radius-toast)',
+        'fufu-bubble': 'var(--fufu-radius-bubble)',
+      },
+      boxShadow: {
+        'fufu': 'var(--fufu-shadow)',
+        'fufu-hover': 'var(--fufu-shadow-hover)',
+        'fufu-float': 'var(--fufu-shadow-float)',
+        'fufu-glow': 'var(--fufu-shadow-glow)',
+        'fufu-card-hover': 'var(--fufu-shadow-card-hover)',
+        'fufu-teal': 'var(--fufu-shadow-teal)',
+      },
+      animation: {
+        'float': 'float 3s ease-in-out infinite',
+        'pulse-soft': 'pulseSoft 2s ease-in-out infinite',
+        'shimmer': 'shimmer 1.5s infinite',
+        'bounce-in': 'bounceIn 0.35s ease-out',
+        'fade-up': 'fadeUp 0.4s ease-out',
+        'slide-right': 'slideRight 0.3s ease-out',
+        'heart-pop': 'heartPop 0.4s ease-out',
+        'loading-bar': 'loadingBar 1.5s ease-in-out infinite',
+        'glow-pulse': 'glowPulse 2s ease-in-out infinite',
+        'music-float': 'musicFloat 4s ease-in-out infinite',
+      },
+      keyframes: {
+        float: { '0%,100%': { transform: 'translateY(0px)' }, '50%': { transform: 'translateY(-6px)' } },
+        pulseSoft: { '0%,100%': { opacity: '1' }, '50%': { opacity: '0.7' } },
+        shimmer: { '0%': { backgroundPosition: '200% 0' }, '100%': { backgroundPosition: '-200% 0' } },
+        bounceIn: { '0%': { transform: 'scale(0.9)', opacity: '0' }, '60%': { transform: 'scale(1.03)' }, '100%': { transform: 'scale(1)', opacity: '1' } },
+        fadeUp: { '0%': { transform: 'translateY(16px)', opacity: '0' }, '100%': { transform: 'translateY(0)', opacity: '1' } },
+        slideRight: { '0%': { transform: 'translateX(-12px)', opacity: '0' }, '100%': { transform: 'translateX(0)', opacity: '1' } },
+        heartPop: { '0%': { transform: 'scale(1)', opacity: '1' }, '50%': { transform: 'scale(1.4) rotate(10deg)', opacity: '0.6' }, '100%': { transform: 'scale(0)', opacity: '0' } },
+        loadingBar: { '0%': { transform: 'translateX(-100%)' }, '100%': { transform: 'translateX(400%)' } },
+        glowPulse: { '0%,100%': { boxShadow: '0 0 8px rgba(var(--fufu-teal), 0.3)' }, '50%': { boxShadow: '0 0 20px rgba(var(--fufu-teal), 0.6)' } },
+        musicFloat: { '0%,100%': { transform: 'translateY(0px) rotate(0deg)' }, '33%': { transform: 'translateY(-10px) rotate(5deg)' }, '66%': { transform: 'translateY(-4px) rotate(-3deg)' } },
+      },
+      screens: {
+        'xs': '360px', 'sm': '640px', 'md': '768px', 'lg': '1024px', 'xl': '1200px',
+      },
+    },
+  },
+  plugins: [],
+}

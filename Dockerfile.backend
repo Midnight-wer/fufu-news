@@ -1,0 +1,31 @@
+# ============================================================
+# fufu新闻 — 后端 Docker 镜像
+# ============================================================
+# 构建：docker build -f Dockerfile.backend -t fufu-backend .
+# 运行：docker run -p 8800:8800 fufu-backend
+# ============================================================
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# 安装系统依赖（lxml 需要编译环境）
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ libxml2-dev libxslt-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# 安装 Python 依赖
+COPY fufu-server/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 复制后端源码
+COPY fufu-server/ .
+
+# 数据目录（挂载点）
+RUN mkdir -p /app/data/logs
+
+# 暴露端口
+EXPOSE 8800
+
+# 启动
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8800"]
