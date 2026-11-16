@@ -1,3 +1,4 @@
+from app.models.access_log import AccessLog, VisitBaseline
 from app.models.achievement import AchievementDef, UserAchievement
 from app.models.article import Article
 from app.models.comment import ArticleComment, CommentLike
@@ -15,4 +16,5 @@ __all__ = [
     "FavoriteFolder", "FavoriteFolderItem",
     "UserProfile", "AgentExperience",
     "ArticleComment", "CommentLike",
+    "AccessLog", "VisitBaseline",
 ]

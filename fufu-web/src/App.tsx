@@ -24,6 +24,7 @@ const SearchPage = lazy(() => import('./pages/SearchPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const RankingPage = lazy(() => import('./pages/RankingPage'));
 const HistoryPage = lazy(() => import('./pages/HistoryPage'));
+const StatsPage = lazy(() => import('./pages/StatsPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -94,6 +95,7 @@ function AnimatedRoutes() {
                 <Route path="/search" element={<SearchPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/ranking" element={<RankingPage />} />
+                <Route path="/stats" element={<StatsPage />} />
                 <Route path="/history" element={<HistoryPage />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Route>

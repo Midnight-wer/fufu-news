@@ -8,6 +8,7 @@ import {
   Gear,
   Fire,
   Clock,
+  ChartBar,
 } from '@phosphor-icons/react';
 import { useSettingsStore } from '../../stores/settingsStore';
 
@@ -15,6 +16,7 @@ const navItems = [
   { to: '/articles', icon: House, label: '首页' },
   { to: '/sources', icon: Rss, label: '订阅源' },
   { to: '/ranking', icon: Fire, label: '排行榜' },
+  { to: '/stats', icon: ChartBar, label: '访问统计' },
   { to: '/favorites', icon: Star, label: '收藏夹' },
   { to: '/later', icon: BookmarkSimple, label: '稍后阅读' },
   { to: '/history', icon: Clock, label: '阅读历史' },

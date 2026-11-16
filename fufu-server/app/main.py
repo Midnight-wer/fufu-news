@@ -50,6 +50,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api.v1.router import router as v1_router  # v1 路由聚合器
+from app.core.access_log import AccessLogMiddleware
 from app.core.anti_crawl import AntiCrawlMiddleware
 from app.core.config import settings  # 全局配置单例
 from app.core.database import init_db  # 数据库初始化函数
@@ -134,6 +135,14 @@ async def lifespan(app: FastAPI):
         t.cancel()
     _BACKGROUND_TASKS.clear()
     stop_scheduler()  # 停止定时任务调度器
+    # 把缓冲区里尚未入库的访问日志刷进数据库，避免关机丢数据
+    try:
+        from app.core.access_log import flush_access_logs
+        flushed = await flush_access_logs()
+        if flushed:
+            logger.info(f"已刷新 {flushed} 条访问日志到数据库")
+    except Exception as e:
+        logger.debug(f"关闭前刷新访问日志失败: {e}")
 
 
 # ========== 创建 FastAPI 应用实例 ==========
@@ -182,6 +191,12 @@ if settings.rate_limit_enabled:
         f"频率限制中间件已启用: {settings.rate_limit_requests_per_minute} req/min "
         f"+ {settings.rate_limit_burst_size} burst"
     )
+
+# ========== 访问日志中间件 ==========
+# 记录每次请求的 IP / 路径 / 状态码 / UA，落到 access_log 表与 logs/access.log，
+# 供「访问统计」后台页展示 PV / UV，也是对外可复核的原始凭据。
+app.add_middleware(AccessLogMiddleware)
+logger.info("访问日志中间件已启用: 数据库 access_log + logs/access.log")
 
 # ========== 反爬虫中间件 ==========
 # 三层防御：UA 验证 + 蜜罐陷阱 + 行为分析

@@ -36,6 +36,7 @@ from app.api.v1 import (
     rss_proxy,
     search,
     sources,
+    stats,
 )
 
 # 创建 v1 路由聚合器实例
@@ -58,3 +59,4 @@ router.include_router(folders.router, tags=["收藏夹文件夹"])
 router.include_router(recommendations.router, prefix="/recommendations", tags=["个性化推荐"])
 router.include_router(comments.router, tags=["评论"])
 router.include_router(profile.router, prefix="/profile", tags=["画像"])
+router.include_router(stats.router, tags=["访问统计"])
