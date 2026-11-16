@@ -168,6 +168,35 @@ def _ensure_flush_task() -> None:
         _FLUSH_TASK = asyncio.get_running_loop().create_task(_flush_loop())
 
 
+def log_access_line(
+    ip: str,
+    method: str,
+    path: str,
+    status_code: int,
+    user_agent: str,
+    referer: str,
+    moment: datetime,
+) -> None:
+    """
+    往 logs/access.log 追加一行 nginx combined 格式的访问记录。
+
+    页面访问上报（POST /stats/hit）也走这里，
+    这样文件里的记录与数据库 access_log 表一一对应，可直接复算 PV / UV。
+    """
+    file_logger = _ensure_file_logger()
+    file_logger.info(
+        '%s - - [%s] "%s %s HTTP/1.1" %d %d "%s" "%s"',
+        ip,
+        moment.strftime("%d/%b/%Y:%H:%M:%S +0000"),
+        method,
+        path,
+        status_code,
+        0,
+        user_agent.replace('"', "'"),
+        referer.replace('"', "'"),
+    )
+
+
 class AccessLogMiddleware(BaseHTTPMiddleware):
     """
     访问日志中间件——记录每次请求的 IP、路径、状态码与 UA。
@@ -214,15 +243,6 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
         _BUFFER.append(item)
         _ensure_flush_task()
 
-        file_logger = _ensure_file_logger()
-        file_logger.info(
-            '%s - - [%s] "%s %s HTTP/1.1" %d %d "%s" "%s"',
-            ip,
-            now.strftime("%d/%b/%Y:%H:%M:%S +0000"),
-            request.method,
-            request.url.path,
-            status_code,
-            0,
-            user_agent.replace('"', "'"),
-            referer.replace('"', "'"),
+        log_access_line(
+            ip, request.method, path, status_code, user_agent, referer, now
         )

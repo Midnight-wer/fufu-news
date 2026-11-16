@@ -24,6 +24,8 @@ dist/
 
 # 数据库
 *.db
+*.db-shm
+*.db-wal
 *.sqlite
 
 # 日志
@@ -39,6 +41,9 @@ Thumbs.db
 
 # 本地交付材料（演示视频 / 体验卡片，按需单独提交）
 交付材料/
+
+# HTML 分享工具的打包产物
+.trae-html-share-packages/
 
 # 上传的图片资源（例外：前端 public 下的静态图片必须入库）
 *.jpeg

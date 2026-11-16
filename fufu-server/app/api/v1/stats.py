@@ -16,7 +16,7 @@ fufu新闻 - 访问统计接口
 import logging
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,6 +41,12 @@ class BaselineInput(BaseModel):
     period_end: str = Field("", description="统计周期结束日期 YYYY-MM-DD")
     source: str = Field("", description="数据来源说明")
     note: str = Field("", description="口径备注")
+
+
+class PageViewInput(BaseModel):
+    """页面访问上报请求体。"""
+
+    path: str = Field("", description="被访问的页面路径")
 
 
 def mask_ip(ip: str) -> str:
@@ -150,9 +156,18 @@ async def get_visit_stats(
         .group_by("day")
         .order_by("day")
     )
-    daily = [
-        {"date": row[0], "pv": row[1], "uv": row[2]} for row in daily_rows.fetchall()
-    ]
+    # 补齐区间内没有访问的日期（0 值），趋势图才能看出「哪些天没人来」
+    daily_map = {
+        row[0]: {"date": row[0], "pv": row[1], "uv": row[2]}
+        for row in daily_rows.fetchall()
+    }
+    daily = []
+    cursor = cutoff.date()
+    today = now.date()
+    while cursor <= today:
+        key = cursor.isoformat()
+        daily.append(daily_map.get(key, {"date": key, "pv": 0, "uv": 0}))
+        cursor += timedelta(days=1)
 
     # ---- 热门页面 ----
     path_rows = await db.execute(
@@ -233,8 +248,8 @@ async def get_visit_stats(
         }
         for b in baseline_rows.scalars().all()
     ]
-    baseline_pv = sum(b.pv for b in baselines)
-    baseline_uv = sum(b.uv for b in baselines)
+    baseline_pv = sum(b["pv"] for b in baselines)
+    baseline_uv = sum(b["uv"] for b in baselines)
 
     pv = int(total_pv or 0)
     uv = int(total_uv or 0)
@@ -264,6 +279,48 @@ async def get_visit_stats(
         "generated_at": now.isoformat(),
     }
     return success(data)
+
+
+@router.post("/hit")
+async def report_page_view(
+    payload: PageViewInput,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    页面访问上报——记录一次真实的页面浏览。
+
+    为什么需要单独上报：开发态前端由 Vite 提供 HTML，后端只收到 /api 接口请求，
+    直接按 HTTP 请求统计会把「一次打开页面触发 5 个接口」算成 5 次访问。
+    这里由前端在路由切换时上报一次，PV 与「独立访客」才对得上真实浏览行为。
+
+    上报本身是 /api 请求，会被中间件记成非页面访问，不会自计数。
+    """
+    from app.core.access_log import client_ip, log_access_line
+
+    path = (payload.path or "/").split("?")[0][:512]
+    ip = client_ip(request)
+    user_agent = (request.headers.get("user-agent") or "")[:512]
+    referer = (request.headers.get("referer") or "")[:512]
+    now = datetime.now(timezone.utc)
+
+    db.add(
+        AccessLog(
+            path=path,
+            method="PAGEVIEW",
+            status_code=200,
+            ip_address=ip,
+            user_agent=user_agent,
+            referer=referer,
+            is_page_view=True,
+            duration_ms=0.0,
+            created_at=now,
+        )
+    )
+    await db.commit()
+    # 同步写入日志文件，保证文件与数据库一一对应，可直接复算 PV / UV
+    log_access_line(ip, "PAGEVIEW", path, 200, user_agent, referer, now)
+    return success({"ip": mask_ip(ip)}, "ok")
 
 
 @router.get("/baselines")

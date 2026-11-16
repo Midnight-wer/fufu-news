@@ -119,3 +119,14 @@ export async function createVisitBaseline(payload: {
 }): Promise<void> {
   await client.post('/stats/baselines', payload);
 }
+
+/**
+ * 上报一次页面访问。
+ *
+ * 开发态 HTML 由 Vite 提供，后端拿到的全是 /api 请求，
+ * 直接按 HTTP 请求数算 PV 会把「打开一次页面触发 5 个接口」算成 5 次访问。
+ * 这里在路由切换时上报一次，服务端按 IP 去重后得到真实的独立访客数。
+ */
+export async function reportPageView(path: string): Promise<void> {
+  await client.post('/stats/hit', { path });
+}

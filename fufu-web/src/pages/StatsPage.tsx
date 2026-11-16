@@ -118,21 +118,22 @@ function TrendChart({ data }: { data: VisitStats['daily'] }) {
     );
   }
   return (
-    <div className="flex items-end gap-1 sm:gap-1.5 h-32 sm:h-40 px-3 sm:px-4 pb-2">
-      {data.map((d) => (
-        <div key={d.date} className="flex-1 flex flex-col items-center gap-1 group min-w-0">
-          <div className="relative w-full flex items-end justify-center" style={{ height: '100%' }}>
+    <div className="flex items-stretch gap-1 sm:gap-1.5 h-32 sm:h-40 px-3 sm:px-4 pt-2">
+      {data.map((d, i) => (
+        <div key={d.date} className="flex-1 flex flex-col items-center gap-1 min-w-0">
+          <div className="relative w-full flex-1 flex items-end justify-center">
             <div
               className="w-full rounded-t-sm transition-all duration-500"
               style={{
-                height: `${Math.max((d.pv / max) * 100, 2)}%`,
+                height: `${Math.max((d.pv / max) * 100, d.pv > 0 ? 4 : 1)}%`,
                 background: 'linear-gradient(180deg, rgb(var(--fufu-teal)), rgb(var(--fufu-teal-soft)))',
+                opacity: d.pv > 0 ? 1 : 0.35,
               }}
               title={`${d.date}｜PV ${d.pv}｜UV ${d.uv}`}
             />
           </div>
-          <span className="font-body text-[9px] text-fufu-text-muted truncate w-full text-center">
-            {d.date.slice(5)}
+          <span className="font-body text-[9px] text-fufu-text-muted whitespace-nowrap w-full text-center">
+            {i === 0 || i === data.length - 1 ? d.date.slice(5) : ''}
           </span>
         </div>
       ))}
@@ -503,7 +504,9 @@ export default function StatsPage() {
                   {stats.recent.map((r, i) => (
                     <div
                       key={`${r.time}-${i}`}
-                      className="flex items-center gap-2 px-4 sm:px-5 py-2 border-b border-fufu-teal-soft/5 last:border-b-0"
+                      className={`flex items-center gap-2 px-4 sm:px-5 py-2 border-b border-fufu-teal-soft/5 last:border-b-0 ${
+                        r.method === 'PAGEVIEW' ? 'bg-fufu-teal-soft/10' : ''
+                      }`}
                     >
                       <span className="font-body text-[10px] text-fufu-text-muted shrink-0 tabular-nums">
                         {r.time ? new Date(r.time).toLocaleTimeString('zh-CN') : '--:--:--'}

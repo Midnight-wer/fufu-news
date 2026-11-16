@@ -13,6 +13,7 @@ import MikuDecorations from './components/effects/MikuDecorations';
 import AiChatDialog from './components/companion/AiChatDialog';
 import AchievementToast from './components/achievements/AchievementToast';
 import { runSelfCheck, getOfflineBanner } from './lib/self-check';
+import { usePageViewTracking } from './hooks/usePageView';
 
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -161,6 +162,9 @@ function AppShell() {
     text: '',
     type: 'info',
   });
+
+  // 页面访问上报（后台统计 PV / UV）
+  usePageViewTracking();
 
   useEffect(() => {
     let cancelled = false;
