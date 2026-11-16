@@ -19,27 +19,27 @@ RSS/网页抓取引擎核心模块，负责从各类信息源获取内容。
 - 支持 RSS/Atom/JSON API/MediaWiki 多种数据源格式
 """
 import asyncio
-import json
 import logging
 import random
 import re
 import time
-import httpx
-import feedparser
-import trafilatura
 from datetime import datetime, timezone
+
+import feedparser
+import httpx
+import trafilatura
 from bs4 import BeautifulSoup
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, exists
+from sqlalchemy import exists, select
+
 from app.core.config import settings
 from app.core.database import async_session
-from app.models.source import Source
 from app.models.article import Article
 from app.models.feed_log import FeedLog
+from app.models.source import Source
 
 logger = logging.getLogger("fufu.fetcher")
 
-# ========== 关键词 → 分类映射 ==========
+# ========== 关键词 → 分类映射（公开分类见 app.core.categories.CATEGORY_NAMES） ==========
 CATEGORY_KEYWORDS: dict[str, list[tuple[str, int]]] = {
     "游戏": [
         ("游戏", 5), ("手游", 4), ("网游", 4), ("电竞", 4), ("Steam", 5),
@@ -141,6 +141,23 @@ FETCH_TIMEOUT = 45
 CONTENT_TIMEOUT = 20
 MAX_RETRIES = 3
 _CONTENT_SEMAPHORE = asyncio.Semaphore(2)
+
+# 同步解析库（trafilatura / feedparser / BeautifulSoup）是否卸载到线程池。
+# 置 False 可一键回退为原来的直接同步调用（回滚用）。
+USE_TO_THREAD = True
+
+
+async def _to_thread(func, *args, **kwargs):
+    """
+    把同步阻塞调用卸载到线程池，避免阻塞事件循环。
+
+    USE_TO_THREAD=False 时等价于直接调用 func(...)，便于快速回退对比。
+    注意：这些库都是 CPU 密集且持有 GIL，to_thread 只让出事件循环，
+    不做并行加速；并发由 _CONTENT_SEMAPHORE 控制。
+    """
+    if not USE_TO_THREAD:
+        return func(*args, **kwargs)
+    return await asyncio.to_thread(func, *args, **kwargs)
 
 # ========== 频率限制（域名级令牌桶 + 异步锁 + 随机抖动） ==========
 _RATE_LIMIT = 2.0
@@ -334,8 +351,8 @@ def _parse_retry_after(response) -> float | None:
 
     # 尝试解析为 HTTP 日期格式
     try:
-        from email.utils import parsedate_to_datetime
         import datetime as dt
+        from email.utils import parsedate_to_datetime
         retry_time = parsedate_to_datetime(retry_after.strip())
         now = dt.datetime.now(dt.timezone.utc)
         if retry_time.tzinfo is None:
@@ -477,10 +494,18 @@ async def fetch_source(source: Source) -> FeedLog:
 
 
 async def _fetch_article_content(client: httpx.AsyncClient, url: str) -> str:
-    """抓取单篇文章正文（同原实现）"""
+    """
+    抓取单篇文章正文。
+
+    性能修复：trafilatura.extract 是同步且 CPU 密集的调用，直接在 async 路径上
+    调用会阻塞整个事件循环（抓取期间 API 无法响应）。改为交给线程池执行。
+    注意：它持有 GIL，to_thread 只是让出事件循环而非并行加速，
+    并发量由 _CONTENT_SEMAPHORE 控制，不会爆线程。
+    """
     try:
         resp = await _retry_fetch(client, url, timeout=CONTENT_TIMEOUT)
-        content = trafilatura.extract(
+        content = await _to_thread(
+            trafilatura.extract,
             resp.text, url=url,
             include_comments=False,
             include_tables=False,
@@ -511,7 +536,9 @@ async def _fetch_rss(
     new_etag = resp.headers.get("ETag") or resp.headers.get("etag")
     new_lm = resp.headers.get("Last-Modified") or resp.headers.get("last-modified")
 
-    feed = feedparser.parse(resp.text)
+    # feedparser.parse 是同步 XML 解析，大 feed 可达数百 ms~数秒，
+    # 在 async 路径上会阻塞事件循环，改为线程池执行。
+    feed = await _to_thread(feedparser.parse, resp.text)
     if feed.bozo and not feed.entries:
         logger.warning(f"RSS解析警告 [{url}]: {feed.bozo_exception}")
 
@@ -605,14 +632,16 @@ async def _fetch_web(
         except Exception as e:
             logger.warning(f"JSON解析失败，回退HTML解析: {url} — {e}")
 
-    content = trafilatura.extract(
+    # 同样避免同步解析阻塞事件循环
+    content = await _to_thread(
+        trafilatura.extract,
         downloaded, url=url,
         include_comments=False,
         include_tables=False,
         output_format="html",
     ) or ""
 
-    soup = BeautifulSoup(downloaded, "lxml")
+    soup = await _to_thread(BeautifulSoup, downloaded, "lxml")
     title = soup.title.get_text(strip=True) if soup.title else ""
 
     logger.debug(f"网页抓取完成: {url} -> {title[:50]}")
@@ -686,7 +715,7 @@ async def _fetch_mediawiki(
     proxy_url: str | None = None,
 ) -> tuple[list[dict] | None, str | None, str | None]:
     """MediaWiki API 抓取（同原实现）"""
-    from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+    from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
     logger.debug(f"MediaWiki抓取: {url}")
 
     parsed = urlparse(url)

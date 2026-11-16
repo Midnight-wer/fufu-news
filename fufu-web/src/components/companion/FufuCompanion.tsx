@@ -33,10 +33,13 @@ export default function FufuCompanion({ onChatOpen }: FufuCompanionProps) {
 
   // 眨眼动画
   useEffect(() => {
-    const id = setInterval(() => {
-      setBlinking(true);
-      setTimeout(() => setBlinking(false), 100);
-    }, 3500 + Math.random() * 2500);
+    const id = setInterval(
+      () => {
+        setBlinking(true);
+        setTimeout(() => setBlinking(false), 100);
+      },
+      3500 + Math.random() * 2500,
+    );
     return () => clearInterval(id);
   }, []);
 
@@ -53,7 +56,11 @@ export default function FufuCompanion({ onChatOpen }: FufuCompanionProps) {
 
   return (
     <motion.div
-      className="fixed right-4 bottom-4 z-[50] select-none cursor-pointer"
+      /*
+       * 移动端要抬到 80px：底部导航栏是 fixed bottom-0 且同在 z-50，
+       * 之前看板娘正好压在导航条上，右边两个 tab（搜索/设置）点不到。
+       */
+      className="fixed right-4 bottom-20 md:bottom-4 z-[50] select-none cursor-pointer"
       style={{ width: baseSize, height: baseSize }}
       animate={{ y: [0, -floatAmplitude, 0] }}
       transition={{ y: { duration: floatPeriod, repeat: Infinity, ease: 'easeInOut' } }}
@@ -69,7 +76,8 @@ export default function FufuCompanion({ onChatOpen }: FufuCompanionProps) {
         animate={{ scale: [1, 1.1, 1] }}
         transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
         style={{
-          background: 'radial-gradient(circle, rgba(0,229,255,0.22) 0%, rgba(57,197,187,0.10) 35%, rgba(255,182,193,0.06) 55%, transparent 70%)',
+          background:
+            'radial-gradient(circle, rgba(var(--fufu-teal), 0.22) 0%, rgba(var(--fufu-teal-deep), 0.10) 35%, rgba(var(--fufu-pink), 0.06) 55%, transparent 70%)',
           filter: 'blur(14px)',
         }}
       />

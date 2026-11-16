@@ -3,7 +3,6 @@ fufu新闻 - 多源聚合对比 Pydantic Schema
 ===========================================
 定义多源聚合对比 API 的请求/响应数据结构。
 """
-from datetime import datetime
 from pydantic import BaseModel, Field
 
 

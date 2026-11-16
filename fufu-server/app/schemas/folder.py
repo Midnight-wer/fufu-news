@@ -4,6 +4,7 @@ fufu新闻 - 收藏夹文件夹 Pydantic Schema
 定义收藏夹文件夹相关的请求/响应数据结构（Pydantic 模型）。
 """
 from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 

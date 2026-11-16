@@ -9,16 +9,20 @@ fufu新闻 - 评论接口
 - POST /comments/{comment_id}/like            → 点赞/取消点赞
 """
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_
+
+from app.api.deps import get_current_user, get_optional_user
 from app.core.database import get_db
-from app.models.user import User
 from app.models.article import Article
 from app.models.comment import ArticleComment, CommentLike
-from app.schemas.comment import CommentCreate, CommentReply, CommentItem
-from app.api.deps import get_current_user, get_optional_user
-from app.schemas.response import success, error
+from app.models.user import User
+from app.schemas.comment import CommentCreate, CommentItem, CommentReply
+from app.schemas.response import error, success
+from app.services.stats import bump_comment_count
 
 logger = logging.getLogger("fufu.comments")
 
@@ -210,6 +214,9 @@ async def create_comment(
     await db.flush()
     await db.refresh(comment)
 
+    # 同步评论数到 article_stats —— 让热度公式里 30% 的评论权重真正生效
+    await bump_comment_count(db, article_id, +1)
+
     logger.info(f"用户 {current_user.username} 评论了文章 {article_id} (comment_id={comment.id})")
 
     return success({
@@ -269,6 +276,9 @@ async def reply_to_comment(
     await db.flush()
     await db.refresh(reply)
 
+    # 回复同样计入评论数
+    await bump_comment_count(db, parent.article_id, +1)
+
     logger.info(f"用户 {current_user.username} 回复了评论 {comment_id} (reply_id={reply.id})")
 
     return success({
@@ -309,10 +319,16 @@ async def delete_comment(
     if comment.user_id != current_user.id:
         return error(code=403, message="只能删除自己的评论哦～")
 
-    # 软删除
+    # 软删除。
+    # 修复：原先写 `updated_at = None`，注释称"SQLite will use default"，
+    # 但显式赋 None 会真的把列写成 NULL，而不是触发默认值。
+    # 这里改为显式赋当前时间。
     comment.content = "[已删除]"
-    comment.updated_at = None  # SQLite will use default
+    comment.updated_at = datetime.now(timezone.utc)
     await db.flush()
+
+    # 同步评论数（软删除也算减少一条有效评论）
+    await bump_comment_count(db, comment.article_id, -1)
 
     logger.info(f"用户 {current_user.username} 删除了评论 {comment_id}")
 

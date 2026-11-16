@@ -1,7 +1,13 @@
 import { useState, useCallback, useRef, type FormEvent } from 'react';
 import { Chat, Heart, ChatCircle, Trash, X, CaretDown, CaretUp } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useComments, useCreateComment, useReplyComment, useDeleteComment, useToggleLike } from '../../hooks/useComments';
+import {
+  useComments,
+  useCreateComment,
+  useReplyComment,
+  useDeleteComment,
+  useToggleLike,
+} from '../../hooks/useComments';
 import { useAuthStore } from '../../stores/authStore';
 import type { CommentItem, CommentsResponse } from '../../api/comments';
 
@@ -30,7 +36,10 @@ function CommentSkeleton() {
   return (
     <div className="space-y-4">
       {[1, 2, 3].map((i) => (
-        <div key={i} className="bg-white/60 rounded-fufu-card border border-fufu-highlight/20 p-4 animate-pulse-soft">
+        <div
+          key={i}
+          className="bg-white/60 rounded-fufu-card border border-fufu-highlight/20 p-4 animate-pulse-soft"
+        >
           <div className="flex items-center gap-3 mb-3">
             <div className="w-8 h-8 rounded-full bg-fufu-soft-purple/30" />
             <div className="space-y-1.5">
@@ -98,10 +107,7 @@ function CommentCard({
   }, [comment.id, deleteComment]);
 
   return (
-    <motion.div
-      variants={staggerItem}
-      className={`${depth === 0 ? '' : 'ml-6 md:ml-10 mt-2'}`}
-    >
+    <motion.div variants={staggerItem} className={`${depth === 0 ? '' : 'ml-6 md:ml-10 mt-2'}`}>
       <div className="bg-white/60 rounded-fufu-card border border-fufu-highlight/20 p-3 md:p-4 group">
         {/* Header: avatar + username + time */}
         <div className="flex items-center gap-2.5 mb-2">
@@ -110,7 +116,9 @@ function CommentCard({
               {isDeleted ? '👻' : (comment.username || '?')[0]}
             </span>
           </div>
-          <span className={`font-cute text-sm truncate max-w-[120px] ${isDeleted ? 'text-fufu-text-muted italic' : 'text-fufu-text'}`}>
+          <span
+            className={`font-cute text-sm truncate max-w-[120px] ${isDeleted ? 'text-fufu-text-muted italic' : 'text-fufu-text'}`}
+          >
             {isDeleted ? '用户已删除' : comment.username}
           </span>
           <span className="text-xs text-fufu-text-muted font-body shrink-0 ml-auto">
@@ -131,7 +139,9 @@ function CommentCard({
         </div>
 
         {/* Content */}
-        <p className={`font-body text-sm leading-relaxed mb-2.5 ml-9 ${isDeleted ? 'text-fufu-text-muted italic' : 'text-fufu-text'}`}>
+        <p
+          className={`font-body text-sm leading-relaxed mb-2.5 ml-9 ${isDeleted ? 'text-fufu-text-muted italic' : 'text-fufu-text'}`}
+        >
           {comment.content}
         </p>
 
@@ -143,9 +153,7 @@ function CommentCard({
               onClick={handleLike}
               disabled={!isLoggedIn || toggleLike.isPending}
               className={`flex items-center gap-1 text-xs font-cute transition-all ${
-                comment.is_liked
-                  ? 'text-fufu-pink'
-                  : 'text-fufu-text-muted hover:text-fufu-pink'
+                comment.is_liked ? 'text-fufu-pink' : 'text-fufu-text-muted hover:text-fufu-pink'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
               title={!isLoggedIn ? '请先登录' : undefined}
             >
@@ -333,13 +341,10 @@ export default function CommentSection({ articleId, previewOnly = false }: Comme
     [replyText, replyComment],
   );
 
-  const handleReplyClick = useCallback(
-    (commentId: number) => {
-      setReplyingTo((prev) => (prev === commentId ? null : commentId));
-      setReplyText('');
-    },
-    [],
-  );
+  const handleReplyClick = useCallback((commentId: number) => {
+    setReplyingTo((prev) => (prev === commentId ? null : commentId));
+    setReplyText('');
+  }, []);
 
   const loadMore = useCallback(() => {
     setPage((p) => p + 1);
@@ -394,9 +399,7 @@ export default function CommentSection({ articleId, previewOnly = false }: Comme
             <Chat size={18} className="text-fufu-teal-deep" />
             <h3 className="font-cute text-fufu-text text-sm">💬 热门评论 ({total})</h3>
           </div>
-          <span className="text-xs text-fufu-teal-deep font-cute cursor-default">
-            下拉查看全部
-          </span>
+          <span className="text-xs text-fufu-teal-deep font-cute cursor-default">下拉查看全部</span>
         </div>
 
         <div className="space-y-2">
@@ -412,7 +415,9 @@ export default function CommentSection({ articleId, previewOnly = false }: Comme
                   </span>
                 </div>
                 <span className="font-cute text-xs text-fufu-text">{comment.username}</span>
-                <span className="text-xs text-fufu-text-muted font-body">{timeAgo(comment.created_at)}</span>
+                <span className="text-xs text-fufu-text-muted font-body">
+                  {timeAgo(comment.created_at)}
+                </span>
               </div>
               <p className="font-body text-xs text-fufu-text leading-relaxed line-clamp-2 ml-8">
                 {comment.content}
@@ -445,7 +450,10 @@ export default function CommentSection({ articleId, previewOnly = false }: Comme
         {/* Sort toggle */}
         <div className="flex items-center bg-white/70 rounded-fufu border border-fufu-highlight/30 overflow-hidden">
           <button
-            onClick={() => { setSort('latest'); setPage(1); }}
+            onClick={() => {
+              setSort('latest');
+              setPage(1);
+            }}
             className={`px-3 py-1 text-xs font-cute transition-colors ${
               sort === 'latest'
                 ? 'bg-fufu-teal/15 text-fufu-teal-deep'
@@ -455,7 +463,10 @@ export default function CommentSection({ articleId, previewOnly = false }: Comme
             最新
           </button>
           <button
-            onClick={() => { setSort('hot'); setPage(1); }}
+            onClick={() => {
+              setSort('hot');
+              setPage(1);
+            }}
             className={`px-3 py-1 text-xs font-cute transition-colors ${
               sort === 'hot'
                 ? 'bg-fufu-teal/15 text-fufu-teal-deep'
@@ -470,7 +481,10 @@ export default function CommentSection({ articleId, previewOnly = false }: Comme
       {/* Comment input form */}
       <div className="mb-5">
         {isLoggedIn ? (
-          <form onSubmit={handleCreateComment} className="bg-white/70 rounded-fufu-card border border-fufu-highlight/30 p-3 md:p-4 shadow-fufu">
+          <form
+            onSubmit={handleCreateComment}
+            className="bg-white/70 rounded-fufu-card border border-fufu-highlight/30 p-3 md:p-4 shadow-fufu"
+          >
             <div className="flex gap-3">
               <div className="w-8 h-8 rounded-full bg-fufu-teal/15 flex items-center justify-center flex-shrink-0">
                 <span className="text-xs font-cute text-fufu-teal-deep">
@@ -503,9 +517,7 @@ export default function CommentSection({ articleId, previewOnly = false }: Comme
           </form>
         ) : (
           <div className="bg-fufu-cream/60 rounded-fufu-card border border-dashed border-fufu-highlight/30 p-4 text-center">
-            <p className="font-body text-sm text-fufu-text-muted">
-              🔒 登录后即可评论
-            </p>
+            <p className="font-body text-sm text-fufu-text-muted">🔒 登录后即可评论</p>
           </div>
         )}
       </div>
@@ -554,9 +566,7 @@ export default function CommentSection({ articleId, previewOnly = false }: Comme
         !isLoading && (
           <div className="text-center py-10">
             <p className="text-3xl mb-3 animate-float">💭</p>
-            <p className="font-cute text-fufu-text-muted">
-              还没有评论，来发表第一条吧～
-            </p>
+            <p className="font-cute text-fufu-text-muted">还没有评论，来发表第一条吧～</p>
           </div>
         )
       )}

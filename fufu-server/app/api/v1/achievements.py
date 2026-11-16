@@ -8,14 +8,14 @@ fufu新闻 - 成就系统 API
 - POST /achievements/check    → 递增成就进度并检查是否新解锁
 """
 from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
 from app.api.deps import get_current_user
-from app.models.user import User
+from app.core.database import get_db
 from app.models.achievement import AchievementDef, UserAchievement
+from app.models.user import User
 
 # 创建成就路由实例
 router = APIRouter()

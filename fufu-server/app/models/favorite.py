@@ -3,11 +3,11 @@ fufu新闻 - 收藏夹文件夹数据模型
 ================================
 定义 FavoriteFolder（收藏夹文件夹）和 FavoriteFolderItem（文件夹-文章关联）ORM 模型。
 """
-from sqlalchemy import (
-    String, Integer, Boolean, DateTime, ForeignKey, UniqueConstraint
-)
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, timezone
+
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.core.database import Base
 
 

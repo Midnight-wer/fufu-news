@@ -36,7 +36,9 @@ function randomParticle(id: number, factor: number): ParticleData {
     baseX: 5 + Math.random() * 90,
     baseY: 60 + Math.random() * 40,
     size: 3 + Math.random() * 8 * factor,
-    duration: anim.floatingParticles.minDuration + Math.random() * (anim.floatingParticles.maxDuration - anim.floatingParticles.minDuration),
+    duration:
+      anim.floatingParticles.minDuration +
+      Math.random() * (anim.floatingParticles.maxDuration - anim.floatingParticles.minDuration),
     delay: Math.random() * 12,
     drift: (Math.random() - 0.5) * 60 * factor,
     color: COLORS[idx].replace(/[\d.]+\)$/, `${alpha})`),
@@ -44,7 +46,13 @@ function randomParticle(id: number, factor: number): ParticleData {
   };
 }
 
-function Particle({ data, mouseRef }: { data: ParticleData; mouseRef: React.MutableRefObject<{ x: number; y: number }> }) {
+function Particle({
+  data,
+  mouseRef,
+}: {
+  data: ParticleData;
+  mouseRef: React.MutableRefObject<{ x: number; y: number }>;
+}) {
   const elRef = useRef<HTMLDivElement>(null);
   const tx = useMotionValue(0);
   const ty = useMotionValue(0);
@@ -70,7 +78,8 @@ function Particle({ data, mouseRef }: { data: ParticleData; mouseRef: React.Muta
       const floatY = -animProgress * window.innerHeight * 0.5;
       const floatX = Math.sin(elapsed * 0.22 + data.id * 0.7) * data.drift * 0.6;
 
-      let rx = 0, ry = 0;
+      let rx = 0,
+        ry = 0;
       const mouse = mouseRef.current;
       const el = elRef.current;
       if (el && mouse.x > 0) {
@@ -127,7 +136,9 @@ export default function FloatingParticles() {
   }, []);
 
   if (particlesRef.current.length === 0) {
-    particlesRef.current = Array.from({ length: PARTICLE_COUNT }, (_, i) => randomParticle(i, factor));
+    particlesRef.current = Array.from({ length: PARTICLE_COUNT }, (_, i) =>
+      randomParticle(i, factor),
+    );
   }
 
   useEffect(() => {

@@ -1,11 +1,12 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App';
 import './styles/index.css';
-import { initThemeAndFontSize } from './stores/settingsStore';
 import ErrorBoundary from './components/common/ErrorBoundary';
 
-// ===== 自动清理旧版/损坏的 localStorage 配置 =====
+const IS_STATIC_BUILD = import.meta.env.VITE_STATIC_MODE === 'true';
+
+// ===== 本地全栈版：自动清理旧版/损坏的 localStorage 配置 =====
+if (!IS_STATIC_BUILD) {
 (function autoCleanupStorage() {
   const CLEANUP_VERSION = 1; // 递增此数字强制清理所有旧配置
   const CLEANUP_KEY = 'fufu-cleanup-version';
@@ -18,14 +19,14 @@ import ErrorBoundary from './components/common/ErrorBoundary';
 
       // 列出所有需要检查/清理的 key
       const keysToCheck = [
-        'fufu-settings',        // 旧版 settings key (v1)
-        'fufu-settings-v2',     // 当前 settings key
-        'fufu-token',           // JWT token（保留，只清理损坏的）
-        'fufu-search-history',  // 搜索历史
-        'fufu-sort',            // 排序偏好
-        'fufu-since',           // 时间筛选
-        'fufu-cat',             // 分类筛选
-        'fufu-poll-votes',      // 投票记录
+        'fufu-settings', // 旧版 settings key (v1)
+        'fufu-settings-v2', // 当前 settings key
+        'fufu-token', // JWT token（保留，只清理损坏的）
+        'fufu-search-history', // 搜索历史
+        'fufu-sort', // 排序偏好
+        'fufu-since', // 时间筛选
+        'fufu-cat', // 分类筛选
+        'fufu-poll-votes', // 投票记录
       ];
 
       let cleanedCount = 0;
@@ -80,13 +81,33 @@ import ErrorBoundary from './components/common/ErrorBoundary';
     console.warn('[fufu] localStorage 不可用，跳过清理:', e);
   }
 })();
+}
 
-initThemeAndFontSize();
+async function bootstrap() {
+  if (IS_STATIC_BUILD) {
+    const { default: PublicApp } = await import('./public/PublicApp');
+    ReactDOM.createRoot(document.getElementById('root')!).render(
+      <React.StrictMode>
+        <ErrorBoundary>
+          <PublicApp />
+        </ErrorBoundary>
+      </React.StrictMode>,
+    );
+    return;
+  }
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
-  </React.StrictMode>,
-);
+  const [{ default: App }, { initThemeAndFontSize }] = await Promise.all([
+    import('./App'),
+    import('./stores/settingsStore'),
+  ]);
+  initThemeAndFontSize();
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
+    </React.StrictMode>,
+  );
+}
+
+void bootstrap();

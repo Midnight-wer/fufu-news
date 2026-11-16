@@ -10,8 +10,9 @@ OPML 是 RSS 阅读器之间通用的订阅源交换格式（XML）。
 - import_opml(): 从 OPML XML 字符串解析并导入订阅源
 """
 from lxml import etree
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models.source import Source
 
 
@@ -85,8 +86,8 @@ async def import_opml(xml_data: str, db: AsyncSession) -> dict:
     """
     try:
         root = etree.fromstring(xml_data.encode("utf-8"))
-    except Exception:
-        raise ValueError("OPML 文件格式不正确呢～")
+    except Exception as e:
+        raise ValueError("OPML 文件格式不正确呢～") from e
 
     created = 0
     skipped = 0

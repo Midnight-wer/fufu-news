@@ -13,27 +13,92 @@ fufu新闻 - 全网搜索 API
 """
 import asyncio
 import logging
+
 from fastapi import APIRouter, Query
-from pydantic import BaseModel
-from app.services.search import search_ddgs, search_ai, is_ddgs_available
+from pydantic import BaseModel, field_validator
+
+from app.services.search import is_ddgs_available, search_ai
 
 logger = logging.getLogger("fufu.api.search")
 router = APIRouter(tags=["全网搜索"])
+
+# 托管中的后台任务引用集合（防止 asyncio 任务被 GC 中途回收）
+_BACKGROUND_TASKS: set = set()
+
+
+# 搜索参数边界（补齐原先缺失的校验，避免超大 page_size 灌爆内存、
+# 以及超长关键词引发全表 LIKE 扫描）
+MAX_KEYWORD_LENGTH = 100
+MAX_RESULTS_DEFAULT = 10
+MAX_RESULTS_LIMIT = 50
 
 
 class SearchRequest(BaseModel):
     """搜索请求体"""
     keyword: str
-    max_results: int = 10
+    max_results: int = MAX_RESULTS_DEFAULT
     skip_cache: bool = False  # 跳过缓存，强制实时搜索
+
+    @field_validator("keyword")
+    @classmethod
+    def _keyword_not_blank(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("关键词不能为空")
+        if len(v) > MAX_KEYWORD_LENGTH:
+            raise ValueError(f"关键词过长（上限 {MAX_KEYWORD_LENGTH} 字符）")
+        return v
+
+    @field_validator("max_results")
+    @classmethod
+    def _max_results_bounded(cls, v: int) -> int:
+        return max(1, min(int(v), MAX_RESULTS_LIMIT))
+
+
+def _clamp_page_size(value: int) -> int:
+    """把任意传入的 page_size 收敛到 1..MAX_RESULTS_LIMIT。"""
+    try:
+        v = int(value)
+    except (TypeError, ValueError):
+        return MAX_RESULTS_DEFAULT
+    return max(1, min(v, MAX_RESULTS_LIMIT))
+
+
+def _cancel_task(task: "asyncio.Future") -> None:
+    """安全取消一个不再需要的任务，抑制取消过程中的噪声。"""
+    if task is None or task.done():
+        return
+    task.cancel()
+
+
+def _detach_background(task: "asyncio.Future", label: str) -> None:
+    """
+    把一个后台任务「托管」出去：保留引用防止被 GC 中途回收，
+    并挂上完成回调以便回收异常，避免 asyncio 报
+    "Task exception was never retrieved"。
+    """
+    if task is None:
+        return
+
+    def _on_done(t: "asyncio.Future") -> None:
+        if t.cancelled():
+            return
+        exc = t.exception()
+        if exc is not None:
+            logger.debug(f"后台任务失败（已忽略）[{label}]: {exc}")
+
+    task.add_done_callback(_on_done)
+    # 持有引用，防止被垃圾回收
+    _BACKGROUND_TASKS.add(task)
+    task.add_done_callback(_BACKGROUND_TASKS.discard)
 
 
 # ========== 主搜索端点 ==========
 
 @router.get("/web")
 async def web_search_get(
-    q: str = Query(default="", min_length=1),
-    max_results: int = 10,
+    q: str = Query(default="", min_length=1, max_length=MAX_KEYWORD_LENGTH),
+    max_results: int = Query(default=MAX_RESULTS_DEFAULT, ge=1, le=MAX_RESULTS_LIMIT),
     skip_cache: bool = False,
 ):
     """全网搜索 GET 兼容"""
@@ -55,6 +120,12 @@ async def _do_search(keyword: str, max_results: int = 10, skip_cache: bool = Fal
     3. 本地无结果 → 等 AI 最多 10s
     """
     keyword = keyword.strip()
+    if not keyword:
+        return {
+            "code": 200, "data": [], "total": 0,
+            "message": "关键词不能为空", "source": "local",
+        }
+    max_results = _clamp_page_size(max_results)
 
     try:
         # 并行启动：本地 FTS5 + AI + DDG 检测
@@ -65,8 +136,13 @@ async def _do_search(keyword: str, max_results: int = 10, skip_cache: bool = Fal
         # 等待本地结果（毫秒级），不等 DDG 检测
         local_results = await local_task
 
-        # 本地有结果 → 立即返回，AI 继续后台跑（结果会缓存供下次用）
+        # 本地有结果 → 立即返回。
+        # AI 任务保留在后台跑（结果会缓存供下次用），但不再放任不管：
+        # 给它加完成回调回收异常，避免出现 "Task exception was never retrieved"，
+        # 同时 DDG 检测任务已无用，显式取消。
         if local_results:
+            _detach_background(ai_task, f"ai-search:{keyword[:20]}")
+            _cancel_task(ddgs_task)
             return {
                 "code": 200, "data": local_results, "total": len(local_results),
                 "message": "local", "source": "local",
@@ -78,7 +154,7 @@ async def _do_search(keyword: str, max_results: int = 10, skip_cache: bool = Fal
         try:
             ddgs_ok = await asyncio.wait_for(ddgs_task, timeout=3.0)
         except asyncio.TimeoutError:
-            pass
+            _cancel_task(ddgs_task)
 
         ai_results = []
         try:
@@ -113,8 +189,9 @@ async def _do_search(keyword: str, max_results: int = 10, skip_cache: bool = Fal
 async def _local_fts_fallback(keyword: str, page_size: int = 10) -> list[dict]:
     """本地搜索——FTS5 全文搜索 + LIKE 兜底"""
     try:
+        from sqlalchemy import or_, select
+
         from app.core.database import async_session
-        from sqlalchemy import select, or_
         from app.models.article import Article
         from app.models.source import Source
 
@@ -193,9 +270,10 @@ async def get_hot_search_terms(limit: int = Query(default=10, ge=1, le=50)):
     最后使用硬编码兜底列表。
     """
     try:
-        from sqlalchemy import select, func
-        from app.models.article import Article
+        from sqlalchemy import select
+
         from app.core.database import async_session
+        from app.models.article import Article
 
         terms = []
         async with async_session() as db:
@@ -247,17 +325,26 @@ async def get_hot_search_terms(limit: int = Query(default=10, ge=1, le=50)):
                     logger.debug("热门搜索：标题策略失败", exc_info=True)
 
         # 策略 3：硬编码兜底
-        while len(terms) < limit:
+        #
+        # 修复说明（原实现是 P0 级故障）：
+        #   原代码为 `while len(terms) < limit: for t in _FALLBACK_HOT_TERMS: ...`
+        #   ——兜底词表只有 12 条且只追加不重复项，当 limit > 可用词数时
+        #   len(terms) 永远无法继续增长，外层 while 永不退出；
+        #   该协程体内没有任何 await，会直接占死整个事件循环，
+        #   且此端点无需认证，一次请求即可让全站永久无响应。
+        # 现在改为有界填充：单趟遍历，凑不满就直接截断返回。
+        if len(terms) < limit:
             for t in _FALLBACK_HOT_TERMS:
+                if len(terms) >= limit:
+                    break
                 if t not in terms:
                     terms.append(t)
-                    if len(terms) >= limit:
-                        break
 
+        result = terms[:limit]
         return {
             "code": 200,
-            "data": terms[:limit],
-            "total": len(terms[:limit]),
+            "data": result,
+            "total": len(result),
             "message": "ok",
         }
     except Exception as e:
@@ -275,7 +362,7 @@ async def get_hot_search_terms(limit: int = Query(default=10, ge=1, le=50)):
 
 @router.get("/suggest")
 async def search_suggest(
-    q: str = Query(default="", min_length=1),
+    q: str = Query(default="", min_length=1, max_length=MAX_KEYWORD_LENGTH),
     limit: int = Query(default=5, ge=1, le=20),
 ):
     """
@@ -285,15 +372,19 @@ async def search_suggest(
     """
     try:
         from sqlalchemy import select
-        from app.models.article import Article
-        from app.core.database import async_session
 
-        pattern = f"%{q.strip()}%"
+        from app.core.database import async_session
+        from app.models.article import Article
+
+        # 转义 LIKE 通配符：用户输入的 % 和 _ 不应被当作通配符，
+        # 否则 "100%" 会匹配到所有标题，既不准又会拖慢查询。
+        keyword = q.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{keyword}%"
 
         async with async_session() as db:
             rows = (await db.execute(
                 select(Article.title, Article.id).where(
-                    Article.title.like(pattern)
+                    Article.title.like(pattern, escape="\\")
                 ).order_by(Article.fetched_at.desc()).limit(limit)
             )).all()
 
@@ -321,7 +412,7 @@ async def search_suggest(
 # ========== 纯 AI 搜索端点 ==========
 
 @router.get("/ai")
-async def ai_search(q: str = Query(default="", min_length=1)):
+async def ai_search(q: str = Query(default="", min_length=1, max_length=MAX_KEYWORD_LENGTH)):
     """纯 AI 搜索端点（DeepSeek API）"""
     try:
         results = await search_ai(q)

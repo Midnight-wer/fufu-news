@@ -17,24 +17,30 @@ function formatHotScore(score: number): string {
 function MedalBadge({ rank }: { rank: number }) {
   if (rank === 1) {
     return (
-      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold text-white"
-        style={{ background: 'linear-gradient(135deg, #FFD700, #FFA500)' }}>
+      <span
+        className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold text-white"
+        style={{ background: 'linear-gradient(135deg, #FFD700, #FFA500)' }}
+      >
         1
       </span>
     );
   }
   if (rank === 2) {
     return (
-      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold text-white"
-        style={{ background: 'linear-gradient(135deg, #C0C0C0, #A8A8A8)' }}>
+      <span
+        className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold text-white"
+        style={{ background: 'linear-gradient(135deg, #C0C0C0, #A8A8A8)' }}
+      >
         2
       </span>
     );
   }
   if (rank === 3) {
     return (
-      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold text-white"
-        style={{ background: 'linear-gradient(135deg, #CD7F32, #B87333)' }}>
+      <span
+        className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold text-white"
+        style={{ background: 'linear-gradient(135deg, #CD7F32, #B87333)' }}
+      >
         3
       </span>
     );
@@ -64,7 +70,11 @@ export default function HotListWidget() {
         <h3 className="font-cute text-sm text-fufu-text">今日热榜</h3>
         {data?.updated_at && (
           <span className="ml-auto font-body text-[10px] text-fufu-text-muted">
-            {new Date(data.updated_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })} 更新
+            {new Date(data.updated_at).toLocaleTimeString('zh-CN', {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}{' '}
+            更新
           </span>
         )}
       </div>

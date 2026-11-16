@@ -93,7 +93,11 @@ export async function runSelfCheck(): Promise<CheckResult[]> {
   return results;
 }
 
-export function getOfflineBanner(): { show: boolean; text: string; type: 'warning' | 'error' | 'info' } {
+export function getOfflineBanner(): {
+  show: boolean;
+  text: string;
+  type: 'warning' | 'error' | 'info';
+} {
   const api = results.find((r) => r.name === 'API 连通性');
   const net = results.find((r) => r.name === '网络状态');
   const db = results.find((r) => r.name === 'IndexedDB');
@@ -104,9 +108,8 @@ export function getOfflineBanner(): { show: boolean; text: string; type: 'warnin
   if (api?.status === 'fail') {
     return {
       show: true,
-      text: db?.status === 'pass'
-        ? '🔌 无法连接后端服务，仅展示本地缓存数据'
-        : '🔌 无法连接后端服务',
+      text:
+        db?.status === 'pass' ? '🔌 无法连接后端服务，仅展示本地缓存数据' : '🔌 无法连接后端服务',
       type: 'error',
     };
   }

@@ -1,31 +1,57 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Star, FolderSimple, DotsThreeVertical, CaretRight, ArrowRight } from '@phosphor-icons/react';
+import {
+  Star,
+  FolderSimple,
+  DotsThreeVertical,
+  CaretRight,
+  ArrowRight,
+} from '@phosphor-icons/react';
 import { motion } from 'framer-motion';
 import { useFavorites, useToggleFavorite } from '../hooks/useArticles';
-import { useFolders, useFolderArticles, useRemoveFromFolder, useMoveArticle, useAddToFolder } from '../hooks/useFolders';
+import {
+  useFolders,
+  useFolderArticles,
+  useRemoveFromFolder,
+  useMoveArticle,
+  useAddToFolder,
+} from '../hooks/useFolders';
 import FolderManager from '../components/favorites/FolderManager';
 import VirtualArticleList from '../components/common/VirtualArticleList';
 import TiltCard from '../components/effects/TiltCard';
 import { ClickRippleWrapper } from '../components/effects/ClickRipple';
-import { type Folder } from '../api/folders';
 
 export default function FavoritesPage() {
   const [page, setPage] = useState(1);
   const [folderPage, setFolderPage] = useState(1);
   const [activeFolderId, setActiveFolderId] = useState<number | null>(null);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; articleId: number; currentFolderId: number | null } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    articleId: number;
+    currentFolderId: number | null;
+  } | null>(null);
 
   // 加载文件夹列表
   const { data: folders = [] } = useFolders();
   const activeFolder = folders.find((f) => f.id === activeFolderId) ?? null;
 
   // 加载全部收藏
-  const { data: allFavData, isLoading: allLoading, isPlaceholderData: allPlaceholder, error: allError, refetch: allRefetch } = useFavorites(page);
+  const {
+    data: allFavData,
+    isLoading: allLoading,
+    isPlaceholderData: allPlaceholder,
+    error: allError,
+    refetch: allRefetch,
+  } = useFavorites(page);
   const showAllLoading = allLoading || allPlaceholder;
 
   // 加载文件夹内的文章
-  const { data: folderData, isLoading: folderLoading, isPlaceholderData: folderPlaceholder } = useFolderArticles(activeFolderId, folderPage);
+  const {
+    data: folderData,
+    isLoading: folderLoading,
+    isPlaceholderData: folderPlaceholder,
+  } = useFolderArticles(activeFolderId, folderPage);
 
   const toggleFav = useToggleFavorite();
   const removeFromFolder = useRemoveFromFolder();
@@ -38,7 +64,7 @@ export default function FavoritesPage() {
   const total = isFolderView ? (folderData?.total ?? 0) : (allFavData?.total ?? 0);
   const currentPage = isFolderView ? folderPage : page;
   const pageSize = isFolderView ? (folderData?.page_size ?? 20) : (allFavData?.page_size ?? 20);
-  const isLoading = isFolderView ? (folderLoading || folderPlaceholder) : showAllLoading;
+  const isLoading = isFolderView ? folderLoading || folderPlaceholder : showAllLoading;
   const error = isFolderView ? null : allError;
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -71,7 +97,7 @@ export default function FavoritesPage() {
       // 文章不在任何文件夹中，直接添加到目标文件夹
       addToFolder.mutate(
         { folderId: toFolderId, articleId: contextMenu.articleId },
-        { onSettled: () => setContextMenu(null) }
+        { onSettled: () => setContextMenu(null) },
       );
       return;
     }
@@ -84,7 +110,7 @@ export default function FavoritesPage() {
     // 文章在文件夹中，移动到另一个文件夹
     moveArticle.mutate(
       { articleId: contextMenu.articleId, fromFolderId: contextMenu.currentFolderId, toFolderId },
-      { onSettled: () => setContextMenu(null) }
+      { onSettled: () => setContextMenu(null) },
     );
   };
 
@@ -127,7 +153,9 @@ export default function FavoritesPage() {
         <div className="text-center py-20">
           <p className="text-6xl mb-4 animate-float">😿</p>
           <p className="font-cute text-xl text-fufu-text">加载收藏失败啦～</p>
-          <button className="fufu-btn-primary mt-4" onClick={() => allRefetch()}>重新加载</button>
+          <button className="fufu-btn-primary mt-4" onClick={() => allRefetch()}>
+            重新加载
+          </button>
         </div>
       ) : isLoading ? (
         <div className="space-y-4">
@@ -140,16 +168,12 @@ export default function FavoritesPage() {
         </div>
       ) : articles.length === 0 ? (
         <div className="text-center py-20">
-          <p className="text-6xl mb-4 animate-float">
-            {isFolderView ? '📂' : '💛'}
-          </p>
+          <p className="text-6xl mb-4 animate-float">{isFolderView ? '📂' : '💛'}</p>
           <p className="font-cute text-xl text-fufu-text">
             {isFolderView ? '这个文件夹还是空的呢～' : '收藏夹还是空的呢～'}
           </p>
           <p className="font-body text-sm text-fufu-text-light mt-2">
-            {isFolderView
-              ? '去文章页面把喜欢的文章加进来吧！'
-              : '遇到喜欢的文章记得点星星哦！'}
+            {isFolderView ? '去文章页面把喜欢的文章加进来吧！' : '遇到喜欢的文章记得点星星哦！'}
           </p>
           {isFolderView && (
             <Link to="/articles" className="fufu-btn-primary inline-flex items-center gap-2 mt-4">
@@ -196,7 +220,10 @@ export default function FavoritesPage() {
                       {/* 取消收藏 */}
                       <ClickRippleWrapper>
                         <button
-                          onClick={(e) => { e.preventDefault(); handleUnfavorite(a.id); }}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleUnfavorite(a.id);
+                          }}
                           className="p-2 rounded-full text-fufu-pink bg-fufu-pink-soft/30 hover:bg-fufu-pink-soft/50 transition-all"
                           title="取消收藏"
                         >
@@ -206,7 +233,10 @@ export default function FavoritesPage() {
                       {/* 右键菜单触发 */}
                       <ClickRippleWrapper>
                         <button
-                          onClick={(e) => { e.preventDefault(); handleContextMenu(e as any, a.id); }}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleContextMenu(e as any, a.id);
+                          }}
                           className="p-2 rounded-full text-fufu-text-muted hover:text-fufu-text bg-transparent hover:bg-fufu-cream transition-all"
                           title="更多操作"
                         >
@@ -253,7 +283,10 @@ export default function FavoritesPage() {
           exit={{ opacity: 0, scale: 0.95 }}
           transition={{ duration: 0.15 }}
           className="fixed z-50 bg-white rounded-fufu-modal shadow-fufu-float border border-fufu-highlight/30 p-1.5 min-w-[180px] overflow-hidden"
-          style={{ left: Math.min(contextMenu.x, window.innerWidth - 200), top: Math.min(contextMenu.y, window.innerHeight - 300) }}
+          style={{
+            left: Math.min(contextMenu.x, window.innerWidth - 200),
+            top: Math.min(contextMenu.y, window.innerHeight - 300),
+          }}
           onClick={(e) => e.stopPropagation()}
         >
           {/* 移动到文件夹子菜单 */}

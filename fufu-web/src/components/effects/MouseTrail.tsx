@@ -62,8 +62,13 @@ function TrailDotComp({
 export default function MouseTrail() {
   const showTrail = useSettingsStore((s) => s.settings.showMouseTrail);
   const intensity = useSettingsStore((s) => s.settings.effectIntensity);
-  const { dotCount: baseDotCount, dotSize: baseDotSize, stiffness, damping, maxOpacity } =
-    anim.mouseTrail;
+  const {
+    dotCount: baseDotCount,
+    dotSize: baseDotSize,
+    stiffness,
+    damping,
+    maxOpacity,
+  } = anim.mouseTrail;
   const factor = intensity / 100;
 
   const dotCount = Math.max(3, Math.round(baseDotCount * factor));

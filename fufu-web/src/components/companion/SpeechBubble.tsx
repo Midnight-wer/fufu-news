@@ -22,9 +22,11 @@ export default function SpeechBubble({ message }: SpeechBubbleProps) {
           >
             {message}
           </div>
-          <div className="absolute left-1/2 -translate-x-1/2 top-full -mt-1
+          <div
+            className="absolute left-1/2 -translate-x-1/2 top-full -mt-1
                           w-0 h-0 border-[6px] border-transparent
-                          border-t-white/95" />
+                          border-t-white/95"
+          />
         </motion.div>
       )}
     </AnimatePresence>

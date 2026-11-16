@@ -7,9 +7,11 @@ fufu新闻 - 成就系统模型
 
 成就种子数据包含 11 个成就，涵盖阅读、收藏、探索、搜索等类别。
 """
-from sqlalchemy import String, Integer, Boolean, DateTime, JSON, ForeignKey
+from datetime import datetime
+
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
-from datetime import datetime, timezone
+
 from app.core.database import Base
 
 

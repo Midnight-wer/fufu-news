@@ -16,8 +16,10 @@ fufu新闻 - 蜜罐端点
 """
 
 import logging
+
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+
 from app.core.anti_crawl import get_anti_crawl
 
 logger = logging.getLogger("fufu.security")

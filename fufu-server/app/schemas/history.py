@@ -4,6 +4,7 @@ fufu新闻 - 阅读历史 Pydantic Schema
 定义阅读历史相关的请求/响应数据结构（Pydantic 模型）。
 """
 from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 

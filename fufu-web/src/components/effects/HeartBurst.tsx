@@ -41,10 +41,13 @@ export default function HeartBurst({
   // Release lock and stop rendering after animation duration
   useEffect(() => {
     if (!shouldRender) return;
-    const timer = setTimeout(() => {
-      setShouldRender(false);
-      lockRef.current.release();
-    }, anim.heartBurst.duration * 1000 + 100); // small buffer after animation ends
+    const timer = setTimeout(
+      () => {
+        setShouldRender(false);
+        lockRef.current.release();
+      },
+      anim.heartBurst.duration * 1000 + 100,
+    ); // small buffer after animation ends
     return () => clearTimeout(timer);
   }, [shouldRender]);
 

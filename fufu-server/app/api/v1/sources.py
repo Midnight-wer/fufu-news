@@ -11,13 +11,14 @@ fufu新闻 - 订阅源接口
 - POST   /sources/fetch-all  → 手动触发全量抓取
 """
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+
+from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.models.source import Source
 from app.models.user import User
-from app.schemas.source import SourceCreate, SourceUpdate, SourceResponse
-from app.api.deps import get_current_user
+from app.schemas.source import SourceCreate, SourceResponse, SourceUpdate
 
 # 创建订阅源路由实例
 router = APIRouter(tags=["订阅源"])

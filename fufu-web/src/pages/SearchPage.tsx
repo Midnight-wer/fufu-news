@@ -1,12 +1,17 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Globe, Newspaper, Spinner, Heart, BookmarkSimple,
-  FadersHorizontal, Check, ArrowUp, ArrowDown, CaretUp, CaretDown,
+  Globe,
+  Newspaper,
+  Heart,
+  BookmarkSimple,
+  FadersHorizontal,
+  ArrowDown,
+  CaretUp,
 } from '@phosphor-icons/react';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import client from '../api/client';
+import { searchArticles, searchWeb, type WebSearchEnvelope } from '../api/search';
 import { useCheckAchievement } from '../hooks/useAchievements';
 import { useToggleFavorite, useToggleLater } from '../hooks/useArticles';
 import { ClickRippleWrapper } from '../components/effects/ClickRipple';
@@ -17,24 +22,24 @@ import SearchAutocomplete from '../components/search/SearchAutocomplete';
 // ===== Types =====
 
 interface LocalArticle {
-  id: number; source_id: number; title: string; summary?: string;
-  source_name?: string; published_at?: string;
+  id: number;
+  source_id: number;
+  title: string;
+  summary?: string;
+  source_name?: string;
+  published_at?: string;
 }
 
 interface WebResult {
-  title: string; url: string; snippet: string; source: string;
-  published_at?: string | null; local_id?: number;
+  title: string;
+  url: string;
+  snippet: string;
+  source: string;
+  published_at?: string | null;
+  local_id?: number;
 }
 
-interface SearchResponse {
-  code: number;
-  data: WebResult[];
-  total: number;
-  message: string;
-  source?: string;
-  ddgs_available?: boolean;
-  ai_pending?: boolean;
-}
+// 全网搜索响应信封统一由 api/search 的 WebSearchEnvelope 提供
 
 // ===== Constants =====
 
@@ -69,7 +74,11 @@ const SORT_OPTIONS: { key: SortOrder; label: string; icon: React.ReactNode }[] =
 // ===== Helpers =====
 
 function getHistory(): string[] {
-  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch { return []; }
+  try {
+    return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+  } catch {
+    return [];
+  }
 }
 
 function saveHistory(term: string) {
@@ -78,7 +87,9 @@ function saveHistory(term: string) {
   localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(0, 10)));
 }
 
-function clearHistory() { localStorage.removeItem(HISTORY_KEY); }
+function clearHistory() {
+  localStorage.removeItem(HISTORY_KEY);
+}
 
 function fmtDate(s?: string | null): string {
   if (!s) return '';
@@ -101,7 +112,9 @@ function fmtDate(s?: string | null): string {
     if (weeks < 4) return `${weeks}周前`;
     if (months < 12) return `${months}个月前`;
     return d.toLocaleDateString('zh-CN');
-  } catch { return s; }
+  } catch {
+    return s;
+  }
 }
 
 /** Highlight matching text by wrapping matches in a <mark> tag */
@@ -113,7 +126,12 @@ function highlightMatch(text: string, query: string): React.ReactNode {
     const parts = text.split(regex);
     return parts.map((part, i) =>
       regex.test(part) ? (
-        <mark key={i} className="search-highlight bg-fufu-teal/20 text-fufu-teal-deep rounded px-0.5 font-medium">{part}</mark>
+        <mark
+          key={i}
+          className="search-highlight bg-fufu-teal/20 text-fufu-teal-deep rounded px-0.5 font-medium"
+        >
+          {part}
+        </mark>
       ) : (
         part
       ),
@@ -129,7 +147,9 @@ function highlightMatch(text: string, query: string): React.ReactNode {
     return (
       <>
         {before}
-        <mark className="search-highlight bg-fufu-teal/20 text-fufu-teal-deep rounded px-0.5 font-medium">{match}</mark>
+        <mark className="search-highlight bg-fufu-teal/20 text-fufu-teal-deep rounded px-0.5 font-medium">
+          {match}
+        </mark>
         {after}
       </>
     );
@@ -139,19 +159,47 @@ function highlightMatch(text: string, query: string): React.ReactNode {
 // ===== Filtering Helpers =====
 
 function applyTimeFilter<T extends { published_at?: string | null }>(
-  items: T[], filter: TimeFilter,
+  items: T[],
+  filter: TimeFilter,
 ): T[] {
   if (filter === 'all') return items;
   const now = Date.now();
-  const cutoff = filter === '24h' ? now - 24 * 3600000
-    : filter === 'week' ? now - 7 * 24 * 3600000
-    : now - 30 * 24 * 3600000;
+  const cutoff =
+    filter === '24h'
+      ? now - 24 * 3600000
+      : filter === 'week'
+        ? now - 7 * 24 * 3600000
+        : now - 30 * 24 * 3600000;
 
   return items.filter((item) => {
     if (!item.published_at) return true; // keep items without date
     const t = new Date(item.published_at).getTime();
     return !isNaN(t) && t >= cutoff;
   });
+}
+
+/**
+ * 本地结果的「热度」打分。
+ * 后端搜索结果目前不带热度字段，这里用可得的信号做一个稳定的近似排序：
+ * 收藏/稍后读权重最高，其次是浏览与评论数（若存在），最后用时间新鲜度兜底。
+ */
+function hotnessOf(item: any): number {
+  let score = 0;
+  if (item?.is_favorite) score += 30;
+  if (item?.is_later) score += 20;
+  score += Number(item?.view_count || 0) * 3;
+  score += Number(item?.comment_count || 0) * 5;
+  score += Number(item?.collect_count || 0) * 2;
+  score += Number(item?.hot_score || 0);
+  const t = item?.published_at || item?.fetched_at;
+  if (t) {
+    const hours = (Date.now() - new Date(t).getTime()) / 36e5;
+    if (Number.isFinite(hours) && hours >= 0) {
+      // 越新分越高，最多贡献 10 分（24h 内约 10 分，逐日衰减）
+      score += Math.max(0, 10 - hours / 24);
+    }
+  }
+  return score;
 }
 
 function applySort<T extends { published_at?: string | null }>(
@@ -179,8 +227,17 @@ function applySort<T extends { published_at?: string | null }>(
         return bExact - aExact;
       });
     }
+  } else if (sort === 'hottest') {
+    // 修复：原先这里根本没有 hottest 分支（注释说"用 fetched_at"但没实现），
+    // 点「最热」按钮结果顺序纹丝不动，等于一个假按钮。
+    // 全网结果由服务端返回、缺少热度字段，保持原序；本地结果按热度近似值排序。
+    const looksLocal = sorted.some(
+      (i: any) => 'is_favorite' in i || 'is_later' in i || 'view_count' in i,
+    );
+    if (looksLocal) {
+      sorted.sort((a, b) => hotnessOf(b) - hotnessOf(a));
+    }
   }
-  // 'hottest' is kept as-is for web results, for local we use fetched_at
   return sorted;
 }
 
@@ -229,24 +286,23 @@ export default function SearchPage() {
     queryKey: ['search', search],
     queryFn: async () => {
       if (!search.trim()) return [];
-      const { data } = await client.get('/articles/search', { params: { q: search } });
-      return data ?? [];
+      return searchArticles<LocalArticle>(search);
     },
     enabled: search.length > 0 && tab === 'local',
     placeholderData: (prev) => prev ?? [],
   });
 
   // Web search
-  const webQuery = useQuery<SearchResponse & { source?: string }>({
+  const webQuery = useQuery<WebSearchEnvelope<WebResult>>({
     queryKey: ['web-search', search],
     queryFn: async ({ signal }) => {
       if (!search.trim()) return { code: 200, data: [], total: 0, message: '' };
       try {
-        const { data } = await client.post('/search/web', {
-          keyword: search, max_results: 20,
-        }, { signal, timeout: 35000 });
+        const data = await searchWeb<WebResult>(search, 20, signal);
         if (data?.data?.length > 0) return data;
-      } catch { /* timeout or failure -> backend already degraded to local */ }
+      } catch {
+        /* timeout or failure -> backend already degraded to local */
+      }
       return { code: 200, data: [], total: 0, message: 'timeout' };
     },
     enabled: search.length > 0 && tab === 'web',
@@ -255,7 +311,11 @@ export default function SearchPage() {
 
   // Achievement check
   useEffect(() => {
-    if (Array.isArray(webQuery.data?.data) && (webQuery.data?.data ?? []).length > 0 && !searchedRef.current) {
+    if (
+      Array.isArray(webQuery.data?.data) &&
+      (webQuery.data?.data ?? []).length > 0 &&
+      !searchedRef.current
+    ) {
       searchedRef.current = true;
       checkAchievement.mutate({ key: 'first_search' });
     }
@@ -283,24 +343,31 @@ export default function SearchPage() {
   }, [localData, timeFilter, sourceFilter, sortOrder, search]);
 
   const dataArr = tab === 'local' ? filteredLocalData : webData;
-  const isLoading = tab === 'local'
-    ? (localQuery.isLoading || localQuery.isPlaceholderData)
-    : (webQuery.isLoading || webQuery.isFetching);
+  const isLoading =
+    tab === 'local'
+      ? localQuery.isLoading || localQuery.isPlaceholderData
+      : webQuery.isLoading || webQuery.isFetching;
   const isError = tab === 'local' ? localQuery.isError : webQuery.isError;
 
   // ===== Quick actions =====
 
-  const handleToggleFav = useCallback((e: React.MouseEvent, itemId: number) => {
-    e.preventDefault();
-    e.stopPropagation();
-    toggleFavorite.mutate({ id: itemId, value: true });
-  }, [toggleFavorite]);
+  const handleToggleFav = useCallback(
+    (e: React.MouseEvent, itemId: number) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleFavorite.mutate({ id: itemId, value: true });
+    },
+    [toggleFavorite],
+  );
 
-  const handleToggleLater = useCallback((e: React.MouseEvent, itemId: number) => {
-    e.preventDefault();
-    e.stopPropagation();
-    toggleLater.mutate({ id: itemId, value: true });
-  }, [toggleLater]);
+  const handleToggleLater = useCallback(
+    (e: React.MouseEvent, itemId: number) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleLater.mutate({ id: itemId, value: true });
+    },
+    [toggleLater],
+  );
 
   // ===== Render helpers =====
 
@@ -364,7 +431,9 @@ export default function SearchPage() {
                       </span>
                     )}
                     {item.published_at && (
-                      <span className="font-body text-xs text-fufu-text-muted ml-auto">{fmtDate(item.published_at)}</span>
+                      <span className="font-body text-xs text-fufu-text-muted ml-auto">
+                        {fmtDate(item.published_at)}
+                      </span>
                     )}
                   </div>
                   <h3 className="font-cute text-base sm:text-lg text-fufu-text group-hover:text-fufu-teal transition-colors leading-snug line-clamp-2">
@@ -382,13 +451,19 @@ export default function SearchPage() {
                   className="fufu-card p-4 sm:p-6 block rounded-fufu-card news-card-hover"
                 >
                   <div className="flex items-center gap-2 mb-2 flex-wrap">
-                    <span className={`fufu-tag font-cute text-xs inline-flex items-center gap-1 ${
-                      item.source === 'AI搜索' || item.source === 'AI'
-                        ? 'bg-purple-100 text-purple-600'
-                        : 'bg-fufu-lavender/20 text-fufu-lavender'
-                    }`}>
-                      {item.source === 'AI搜索' || item.source === 'AI' ? '🤖' : <Globe size={12} />}
-                      {' '}{item.source === 'AI搜索' || item.source === 'AI' ? 'AI 搜索' : '全网搜索'}
+                    <span
+                      className={`fufu-tag font-cute text-xs inline-flex items-center gap-1 ${
+                        item.source === 'AI搜索' || item.source === 'AI'
+                          ? 'bg-purple-100 text-purple-600'
+                          : 'bg-fufu-lavender/20 text-fufu-lavender'
+                      }`}
+                    >
+                      {item.source === 'AI搜索' || item.source === 'AI' ? (
+                        '🤖'
+                      ) : (
+                        <Globe size={12} />
+                      )}{' '}
+                      {item.source === 'AI搜索' || item.source === 'AI' ? 'AI 搜索' : '全网搜索'}
                     </span>
                     {item.source && item.source !== 'AI搜索' && item.source !== 'AI' && (
                       <span className="font-body text-xs text-fufu-text-muted bg-fufu-cream px-2 py-0.5 rounded-fufu-tag">
@@ -396,7 +471,9 @@ export default function SearchPage() {
                       </span>
                     )}
                     {item.published_at && (
-                      <span className="font-body text-xs text-fufu-text-muted ml-auto">{fmtDate(item.published_at)}</span>
+                      <span className="font-body text-xs text-fufu-text-muted ml-auto">
+                        {fmtDate(item.published_at)}
+                      </span>
                     )}
                   </div>
                   <h3 className="font-cute text-base sm:text-lg text-fufu-text group-hover:text-fufu-lavender transition-colors leading-snug">
@@ -457,7 +534,9 @@ export default function SearchPage() {
       {/* Header */}
       <div className="mb-6">
         <h2 className="font-cute text-3xl text-fufu-text">🔎 搜一搜</h2>
-        <p className="font-body text-sm text-fufu-text-light mt-1">本地搜 + 全网搜，找找你想看的新闻～</p>
+        <p className="font-body text-sm text-fufu-text-light mt-1">
+          本地搜 + 全网搜，找找你想看的新闻～
+        </p>
       </div>
 
       {/* SearchAutocomplete replaces the raw input */}
@@ -468,9 +547,7 @@ export default function SearchPage() {
       />
 
       {/* Hot Search Terms (show when no active search) */}
-      {search.length === 0 && (
-        <HotSearchTerms onTermClick={handleSearchWithTerm} />
-      )}
+      {search.length === 0 && <HotSearchTerms onTermClick={handleSearchWithTerm} />}
 
       {/* Search History (show when no active search and hot terms not showing) */}
       {search.length === 0 && history.length > 0 && (
@@ -480,7 +557,10 @@ export default function SearchPage() {
               🕐 最近搜索
             </span>
             <button
-              onClick={() => { clearHistory(); setHistory([]); }}
+              onClick={() => {
+                clearHistory();
+                setHistory([]);
+              }}
               className="font-body text-xs text-fufu-text-muted hover:text-fufu-pink transition-colors"
             >
               清空
@@ -558,19 +638,19 @@ export default function SearchPage() {
                 <span className="font-cute text-xs text-fufu-text-muted mb-2 block">时间范围</span>
                 <div className="filter-scroll md:overflow-visible">
                   <div className="flex gap-1.5">
-                  {TIME_FILTERS.map((f) => (
-                    <button
-                      key={f.key}
-                      onClick={() => setTimeFilter(f.key)}
-                      className={`flex-shrink-0 px-3 py-1.5 rounded-fufu-tag font-body text-xs transition-all duration-150 touch-target ${
-                        timeFilter === f.key
-                          ? 'bg-fufu-teal text-white shadow-sm'
-                          : 'bg-fufu-cream text-fufu-text-light hover:bg-fufu-highlight'
-                      }`}
-                    >
-                      {f.label}
-                    </button>
-                  ))}
+                    {TIME_FILTERS.map((f) => (
+                      <button
+                        key={f.key}
+                        onClick={() => setTimeFilter(f.key)}
+                        className={`flex-shrink-0 px-3 py-1.5 rounded-fufu-tag font-body text-xs transition-all duration-150 touch-target ${
+                          timeFilter === f.key
+                            ? 'bg-fufu-teal text-white shadow-sm'
+                            : 'bg-fufu-cream text-fufu-text-light hover:bg-fufu-highlight'
+                        }`}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -580,19 +660,19 @@ export default function SearchPage() {
                 <span className="font-cute text-xs text-fufu-text-muted mb-2 block">来源分类</span>
                 <div className="filter-scroll md:overflow-visible">
                   <div className="flex gap-1.5">
-                  {SOURCE_FILTERS.map((f) => (
-                    <button
-                      key={f.key}
-                      onClick={() => setSourceFilter(f.key)}
-                      className={`flex-shrink-0 px-3 py-1.5 rounded-fufu-tag font-body text-xs transition-all duration-150 touch-target ${
-                        sourceFilter === f.key
-                          ? 'bg-fufu-pink text-white shadow-sm'
-                          : 'bg-fufu-pink-soft/30 text-fufu-text-light hover:bg-fufu-pink-soft/50'
-                      }`}
-                    >
-                      {f.label}
-                    </button>
-                  ))}
+                    {SOURCE_FILTERS.map((f) => (
+                      <button
+                        key={f.key}
+                        onClick={() => setSourceFilter(f.key)}
+                        className={`flex-shrink-0 px-3 py-1.5 rounded-fufu-tag font-body text-xs transition-all duration-150 touch-target ${
+                          sourceFilter === f.key
+                            ? 'bg-fufu-pink text-white shadow-sm'
+                            : 'bg-fufu-pink-soft/30 text-fufu-text-light hover:bg-fufu-pink-soft/50'
+                        }`}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -602,20 +682,20 @@ export default function SearchPage() {
                 <span className="font-cute text-xs text-fufu-text-muted mb-2 block">排序方式</span>
                 <div className="filter-scroll md:overflow-visible">
                   <div className="flex gap-1.5">
-                  {SORT_OPTIONS.map((o) => (
-                    <button
-                      key={o.key}
-                      onClick={() => setSortOrder(o.key)}
-                      className={`flex-shrink-0 px-3 py-1.5 rounded-fufu-tag font-body text-xs transition-all duration-150 inline-flex items-center gap-1 touch-target ${
-                        sortOrder === o.key
-                          ? 'bg-fufu-teal-deep text-white shadow-sm'
-                          : 'bg-fufu-mint-light/30 text-fufu-text-light hover:bg-fufu-mint-light/50'
-                      }`}
-                    >
-                      {o.icon}
-                      {o.label}
-                    </button>
-                  ))}
+                    {SORT_OPTIONS.map((o) => (
+                      <button
+                        key={o.key}
+                        onClick={() => setSortOrder(o.key)}
+                        className={`flex-shrink-0 px-3 py-1.5 rounded-fufu-tag font-body text-xs transition-all duration-150 inline-flex items-center gap-1 touch-target ${
+                          sortOrder === o.key
+                            ? 'bg-fufu-teal-deep text-white shadow-sm'
+                            : 'bg-fufu-mint-light/30 text-fufu-text-light hover:bg-fufu-mint-light/50'
+                        }`}
+                      >
+                        {o.icon}
+                        {o.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -625,9 +705,11 @@ export default function SearchPage() {
                 <div className="pt-2 border-t border-fufu-teal/5">
                   <span className="font-body text-xs text-fufu-text-muted">
                     当前筛选：{dataArr.length} 条结果
-                    {timeFilter !== 'all' && ` · ${TIME_FILTERS.find(f => f.key === timeFilter)?.label}`}
+                    {timeFilter !== 'all' &&
+                      ` · ${TIME_FILTERS.find((f) => f.key === timeFilter)?.label}`}
                     {sourceFilter !== 'all' && ` · ${sourceFilter}`}
-                    {sortOrder !== 'relevance' && ` · ${SORT_OPTIONS.find(o => o.key === sortOrder)?.label}`}
+                    {sortOrder !== 'relevance' &&
+                      ` · ${SORT_OPTIONS.find((o) => o.key === sortOrder)?.label}`}
                   </span>
                 </div>
               )}
@@ -667,10 +749,7 @@ export default function SearchPage() {
               ? '全网搜索暂时连接不上呢…要确保后端已经启动了哦～'
               : '本地搜索出了点小问题，换个关键词试试看？'}
           </p>
-          <button
-            className="fufu-btn-primary mt-4"
-            onClick={() => handleSearchWithTerm(search)}
-          >
+          <button className="fufu-btn-primary mt-4" onClick={() => handleSearchWithTerm(search)}>
             重新搜索 🔄
           </button>
         </div>
@@ -704,14 +783,19 @@ export default function SearchPage() {
             animate={{ scale: 1 }}
             transition={{ type: 'spring', stiffness: 200, damping: 15 }}
           >
-            {tab === 'web' && (webQuery.data?.message === 'timeout' || webQuery.data?.message === 'local_fallback')
+            {tab === 'web' &&
+            (webQuery.data?.message === 'timeout' || webQuery.data?.message === 'local_fallback')
               ? '⏰'
               : '🔍'}
           </motion.p>
           <p className="font-cute text-xl text-fufu-text">
-            {tab === 'web' && webQuery.data?.message === 'timeout' && webQuery.data?.source === 'none'
+            {tab === 'web' &&
+            webQuery.data?.message === 'timeout' &&
+            webQuery.data?.source === 'none'
               ? '全网搜索超时，本地也没有匹配结果 😿'
-              : tab === 'web' && (webQuery.data?.message === 'timeout' || webQuery.data?.message === 'local_fallback')
+              : tab === 'web' &&
+                  (webQuery.data?.message === 'timeout' ||
+                    webQuery.data?.message === 'local_fallback')
                 ? '全网搜索超时，已自动切换到本地搜索 📰'
                 : '没有找到相关结果'}
           </p>
@@ -778,9 +862,9 @@ export default function SearchPage() {
                 {webQuery.data.source === 'local' || webQuery.data.message === 'local'
                   ? '📰 以下来自本地文章库（秒级响应）'
                   : webQuery.data.source === 'web'
-                    ? (webQuery.data.ddgs_available === false
+                    ? webQuery.data.ddgs_available === false
                       ? '🤖 以下来自 AI 智能搜索'
-                      : '🌐 以下来自全网实时搜索')
+                      : '🌐 以下来自全网实时搜索'
                     : null}
               </p>
               {webQuery.data.ai_pending && (
@@ -794,7 +878,7 @@ export default function SearchPage() {
           {/* Result count */}
           <p className="font-body text-xs text-fufu-text-muted text-center">
             找到 {dataArr.length} 条结果
-            {timeFilter !== 'all' && ` · ${TIME_FILTERS.find(f => f.key === timeFilter)?.label}`}
+            {timeFilter !== 'all' && ` · ${TIME_FILTERS.find((f) => f.key === timeFilter)?.label}`}
             {sourceFilter !== 'all' && ` · 来源：${sourceFilter}`}
           </p>
 

@@ -7,6 +7,7 @@ fufu新闻 - 健康检查接口
 """
 from fastapi import APIRouter
 from sqlalchemy import text
+
 from app.core.database import async_session
 
 # 创建健康检查路由实例

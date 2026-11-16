@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://37k2mwv2jfd9zk9mo7w.traesite.cn/sitemap.xml

@@ -4,9 +4,11 @@ fufu新闻 - 订阅源数据模型
 定义 Source（订阅源/RSS源）ORM 模型。
 每个订阅源对应一个 RSS Feed URL 或网页数据接口。
 """
-from sqlalchemy import String, Integer, DateTime, Text
-from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime, timezone
+
+from sqlalchemy import DateTime, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column
+
 from app.core.database import Base
 
 

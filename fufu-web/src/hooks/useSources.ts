@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import client from '../api/client';
+import { unwrapList, unwrapOr } from '../api/unwrap';
 
 export interface Source {
   id: number;
@@ -19,7 +20,8 @@ export function useSources() {
     queryKey: ['sources'],
     queryFn: async () => {
       const { data } = await client.get('/sources');
-      return data ?? [];
+      // sources 是裸返回；unwrapList 恒等透传，同时保证异常时至少是 []
+      return unwrapList<Source>(data);
     },
     placeholderData: [],
   });
@@ -30,7 +32,7 @@ export function useCreateSource() {
   return useMutation({
     mutationFn: async (source: Partial<Source>) => {
       const { data } = await client.post('/sources', source);
-      return data;
+      return unwrapOr<Source>(data, null as unknown as Source);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sources'] });
@@ -43,7 +45,7 @@ export function useUpdateSource() {
   return useMutation({
     mutationFn: async ({ id, ...data }: Partial<Source> & { id: number }) => {
       const { data: result } = await client.patch(`/sources/${id}`, data);
-      return result;
+      return unwrapOr<Source>(result, null as unknown as Source);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sources'] });
@@ -68,7 +70,7 @@ export function useFetchSource() {
   return useMutation({
     mutationFn: async (id: number) => {
       const { data } = await client.post(`/sources/${id}/fetch`);
-      return data;
+      return unwrapOr(data, null);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sources'] });

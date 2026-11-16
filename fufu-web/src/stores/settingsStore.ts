@@ -8,8 +8,17 @@ import { persist } from 'zustand/middleware';
 
 export type ThemeMode = 'miku' | 'milktea' | 'dark';
 
+/** 支持的 AI 后端标识（与设置页的预设表保持一致） */
+export type AiBackendKey = 'deepseek' | 'openai' | 'moonshot' | 'ollama';
+
+const AI_BACKEND_KEYS: readonly AiBackendKey[] = ['deepseek', 'openai', 'moonshot', 'ollama'];
+
+function isAiBackendKey(v: unknown): v is AiBackendKey {
+  return typeof v === 'string' && (AI_BACKEND_KEYS as readonly string[]).includes(v);
+}
+
 export interface Settings {
-  aiBackend: 'deepseek' | 'ollama' | 'openai';
+  aiBackend: AiBackendKey;
   aiModel: string;
   aiBaseUrl: string;
   aiApiKey: string;
@@ -44,7 +53,6 @@ const DEFAULTS: Settings = {
 
 const VALID_THEMES: readonly string[] = ['miku', 'milktea', 'dark'];
 const VALID_FONT_SIZES: readonly string[] = ['small', 'medium', 'large'];
-const VALID_AI_BACKENDS: readonly string[] = ['deepseek', 'ollama', 'openai'];
 const STORAGE_KEY = 'fufu-settings-v2';
 const CURRENT_VERSION = 4;
 
@@ -52,10 +60,18 @@ const CURRENT_VERSION = 4;
 // L0: localStorage 安全原语（永不抛异常）
 // ================================================================
 function _lsGet(key: string): string | null {
-  try { return localStorage.getItem(key); } catch { return null; }
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
 }
 function _lsDel(key: string): void {
-  try { localStorage.removeItem(key); } catch { /* 静默 */ }
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    /* 静默 */
+  }
 }
 
 // ================================================================
@@ -144,6 +160,11 @@ function _safeMerge(raw: Record<string, unknown>): Settings {
 
   if (_isValidTheme(raw.theme)) s.theme = raw.theme;
   if (_isValidFontSize(raw.fontSize)) s.fontSize = raw.fontSize as Settings['fontSize'];
+  // aiBackend 修复：原先这一行漏掉了，导致每次读取设置时 aiBackend 都被重置为
+  // DEFAULTS 里的 'deepseek'，用户在设置页选的后端刷新后丢失。
+  if (_isNonEmptyStr(raw.aiBackend) && isAiBackendKey(raw.aiBackend)) {
+    s.aiBackend = raw.aiBackend;
+  }
   if (_isNonEmptyStr(raw.aiModel)) s.aiModel = raw.aiModel;
   if (_isNonEmptyStr(raw.aiBaseUrl)) s.aiBaseUrl = raw.aiBaseUrl;
   if (_isStr(raw.aiApiKey)) s.aiApiKey = raw.aiApiKey;
@@ -182,7 +203,9 @@ function safeReadAndMigrateSettings(): Settings {
       if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
         parsed = v as Record<string, unknown>;
       }
-    } catch { /* 解析失败 → parsed 保持 null */ }
+    } catch {
+      /* 解析失败 → parsed 保持 null */
+    }
   }
 
   if (parsed === null) {
@@ -216,7 +239,8 @@ function safeReadAndMigrateSettings(): Settings {
   }
 
   if (storedVersion < CURRENT_VERSION) {
-    console.log('[fufu] 🟡 版本过低 v' + storedVersion + ' → 全量重置为 v' + CURRENT_VERSION + ' 默认 miku 配置');
+    if (import.meta.env.DEV)
+      console.info('[fufu] 版本过低，已重置为默认配置', storedVersion, '→', CURRENT_VERSION);
     return { ...DEFAULTS };
   }
 
@@ -234,7 +258,7 @@ export const useSettingsStore = create<SettingsState>()(
       settings: safeReadAndMigrateSettings(),
       updateSettings: (partial) =>
         set((s) => {
-          const base = (s && s.settings) ? s.settings : { ...DEFAULTS };
+          const base = s && s.settings ? s.settings : { ...DEFAULTS };
           const next = { ...base, ...partial };
           _applyDOM(next.theme, next.fontSize);
           return { settings: next };
@@ -259,7 +283,9 @@ function _applyDOM(theme: unknown, fontSize: unknown): void {
     root.classList.remove('dark');
     root.setAttribute('data-theme', _isValidTheme(theme) ? theme : 'miku');
     root.setAttribute('data-font-size', _isValidFontSize(fontSize) ? String(fontSize) : 'medium');
-  } catch { /* DOM 不可用 */ }
+  } catch {
+    /* DOM 不可用 */
+  }
 }
 
 // ================================================================
@@ -295,21 +321,34 @@ export function initThemeAndFontSize(): void {
 // ================================================================
 export function resetAllSettings(): void {
   const KEYS = [
-    'fufu-settings', 'fufu-settings-v2', 'fufu-token',
-    'fufu-search-history', 'fufu-sort', 'fufu-since',
-    'fufu-cat', 'fufu-poll-votes', 'fufu-cleanup-version',
+    'fufu-settings',
+    'fufu-settings-v2',
+    'fufu-token',
+    'fufu-search-history',
+    'fufu-sort',
+    'fufu-since',
+    'fufu-cat',
+    'fufu-poll-votes',
+    'fufu-cleanup-version',
     'fufu-reshuffle',
   ];
 
   let n = 0;
   for (let i = 0; i < KEYS.length; i++) {
-    if (_lsGet(KEYS[i]) !== null) { _lsDel(KEYS[i]); n++; }
+    if (_lsGet(KEYS[i]) !== null) {
+      _lsDel(KEYS[i]);
+      n++;
+    }
   }
 
-  console.log('[fufu] 🧹 已清除 ' + n + ' 项缓存，刷新页面...');
+  if (import.meta.env.DEV) console.info('[fufu] 已清除缓存项:', n);
   _applyDOM('miku', 'medium');
 
-  try { setTimeout(() => window.location.reload(), 200); } catch { /* 无 window */ }
+  try {
+    setTimeout(() => window.location.reload(), 200);
+  } catch {
+    /* 无 window */
+  }
 }
 
 if (typeof window !== 'undefined') {

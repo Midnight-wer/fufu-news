@@ -1,6 +1,15 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Fire, Calendar, Trophy, ArrowUp, ArrowDown, ArrowRight, Sparkle, CaretRight } from '@phosphor-icons/react';
+import {
+  Fire,
+  Calendar,
+  Trophy,
+  ArrowUp,
+  ArrowDown,
+  ArrowRight,
+  Sparkle,
+  CaretRight,
+} from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDailyRanking, useWeeklyRanking, useMonthlyRanking } from '../hooks/useRanking';
 import type { RankingItem } from '../api/ranking';
@@ -62,17 +71,18 @@ function TrendBadge({ trend }: { trend?: string }) {
 function HotLabel({ label }: { label?: string }) {
   if (!label) return null;
   const colors: Record<string, string> = {
-    '爆': 'linear-gradient(135deg, #FF4444, #FF6B6B)',
-    '热': 'linear-gradient(135deg, #FF8C00, #FFA500)',
-    '新': 'linear-gradient(135deg, #00BFFF, #1E90FF)',
+    爆: 'linear-gradient(135deg, #FF4444, #FF6B6B)',
+    热: 'linear-gradient(135deg, #FF8C00, #FFA500)',
+    新: 'linear-gradient(135deg, #00BFFF, #1E90FF)',
   };
-  const icons: Record<string, string> = { '爆': '🔥', '热': '⭐', '新': '🆕' };
+  const icons: Record<string, string> = { 爆: '🔥', 热: '⭐', 新: '🆕' };
   return (
     <span
       className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full font-cute text-[10px] text-white shrink-0"
       style={{ background: colors[label] || colors['新'] }}
     >
-      {icons[label] || '🆕'}{label}
+      {icons[label] || '🆕'}
+      {label}
     </span>
   );
 }
@@ -83,17 +93,23 @@ function RankingRow({ item, rank }: { item: RankingItem; rank: number }) {
     <Link to={`/articles/${item.article_id}`}>
       <motion.div
         className={`group flex items-center gap-2 sm:gap-4 px-3 sm:px-5 py-2.5 sm:py-4 transition-all duration-200 cursor-pointer
-          ${isTop3
-            ? 'rounded-fufu-card border border-transparent hover:border-fufu-teal/15'
-            : 'rounded-fufu border-b border-fufu-teal-soft/8 last:border-b-0'
+          ${
+            isTop3
+              ? 'rounded-fufu-card border border-transparent hover:border-fufu-teal/15'
+              : 'rounded-fufu border-b border-fufu-teal-soft/8 last:border-b-0'
           }`}
-        style={isTop3 ? {
-          background: rank === 1
-            ? 'linear-gradient(135deg, rgba(255,215,0,0.06), rgba(255,255,255,0.4))'
-            : rank === 2
-              ? 'linear-gradient(135deg, rgba(192,192,192,0.06), rgba(255,255,255,0.4))'
-              : 'linear-gradient(135deg, rgba(205,127,50,0.06), rgba(255,255,255,0.4))',
-        } : undefined}
+        style={
+          isTop3
+            ? {
+                background:
+                  rank === 1
+                    ? 'linear-gradient(135deg, rgba(255,215,0,0.06), rgba(255,255,255,0.4))'
+                    : rank === 2
+                      ? 'linear-gradient(135deg, rgba(192,192,192,0.06), rgba(255,255,255,0.4))'
+                      : 'linear-gradient(135deg, rgba(205,127,50,0.06), rgba(255,255,255,0.4))',
+              }
+            : undefined
+        }
         whileHover={isTop3 ? { scale: 1.01, y: -1 } : { x: 4 }}
         transition={{ type: 'spring', stiffness: 300, damping: 25 }}
         initial={{ opacity: 0, x: -20 }}
@@ -108,22 +124,32 @@ function RankingRow({ item, rank }: { item: RankingItem; rank: number }) {
               {item.source_name}
             </span>
           </div>
-          <h3 className={`font-cute text-xs sm:text-sm ${isTop3 ? 'sm:text-base' : ''} text-fufu-text group-hover:text-fufu-pink transition-colors line-clamp-1`}>
+          <h3
+            className={`font-cute text-xs sm:text-sm ${isTop3 ? 'sm:text-base' : ''} text-fufu-text group-hover:text-fufu-pink transition-colors line-clamp-1`}
+          >
             {item.title}
           </h3>
           {isTop3 && (
             <div className="flex items-center gap-2 sm:gap-3 mt-1">
-              <span className="font-body text-[10px] sm:text-[11px] text-fufu-text-muted">👁 {formatHotScore(item.view_count)}</span>
-              <span className="font-body text-[10px] sm:text-[11px] text-fufu-text-muted">💬 {formatHotScore(item.comment_count)}</span>
-              <span className="font-body text-[10px] sm:text-[11px] text-fufu-text-muted">⭐ {formatHotScore(item.collect_count)}</span>
+              <span className="font-body text-[10px] sm:text-[11px] text-fufu-text-muted">
+                👁 {formatHotScore(item.view_count)}
+              </span>
+              <span className="font-body text-[10px] sm:text-[11px] text-fufu-text-muted">
+                💬 {formatHotScore(item.comment_count)}
+              </span>
+              <span className="font-body text-[10px] sm:text-[11px] text-fufu-text-muted">
+                ⭐ {formatHotScore(item.collect_count)}
+              </span>
             </div>
           )}
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          <span className={`font-cute ${isTop3 ? 'text-base sm:text-lg font-bold' : 'text-xs sm:text-sm'} ${
-            isTop3 ? 'text-fufu-pink' : 'text-fufu-text-light'
-          }`}>
+          <span
+            className={`font-cute ${isTop3 ? 'text-base sm:text-lg font-bold' : 'text-xs sm:text-sm'} ${
+              isTop3 ? 'text-fufu-pink' : 'text-fufu-text-light'
+            }`}
+          >
             {formatHotScore(item.hot_score)}
           </span>
           <div className="w-5 sm:w-6 flex justify-center">
@@ -132,7 +158,10 @@ function RankingRow({ item, rank }: { item: RankingItem; rank: number }) {
         </div>
 
         {!isTop3 && (
-          <CaretRight size={12} className="text-fufu-text-muted/20 group-hover:text-fufu-teal transition-colors shrink-0" />
+          <CaretRight
+            size={12}
+            className="text-fufu-text-muted/20 group-hover:text-fufu-teal transition-colors shrink-0"
+          />
         )}
       </motion.div>
     </Link>
@@ -141,7 +170,9 @@ function RankingRow({ item, rank }: { item: RankingItem; rank: number }) {
 
 function SkeletonRow({ isTop3 }: { isTop3: boolean }) {
   return (
-    <div className={`flex items-center gap-3 sm:gap-4 px-3 sm:px-5 ${isTop3 ? 'py-4 sm:py-5' : 'py-3 sm:py-4'}`}>
+    <div
+      className={`flex items-center gap-3 sm:gap-4 px-3 sm:px-5 ${isTop3 ? 'py-4 sm:py-5' : 'py-3 sm:py-4'}`}
+    >
       <div className="skeleton w-9 h-9 sm:w-10 sm:h-10 rounded-xl shrink-0" />
       <div className="flex-1 space-y-2">
         <div className="skeleton h-3 w-16 sm:w-20 rounded" />
@@ -167,9 +198,6 @@ export default function RankingPage() {
   const updatedAt = activeQuery.data?.updated_at;
 
   const activeIndex = TAB_INDEX[tab];
-
-  // 如果数据为空且不在加载中，给一个提示去浏览文章
-  const showEmptyGuide = !isLoading && !isError && items.length === 0;
 
   return (
     <div>
@@ -227,7 +255,8 @@ export default function RankingPage() {
       {/* Update time */}
       {updatedAt && !isLoading && items.length > 0 && (
         <p className="font-body text-[11px] text-fufu-text-muted mb-3 text-right">
-          更新于 {new Date(updatedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+          更新于{' '}
+          {new Date(updatedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
         </p>
       )}
 
@@ -265,9 +294,7 @@ export default function RankingPage() {
         ) : items.length === 0 ? (
           /* 空状态 — 带引导 */
           <div className="text-center py-16 sm:py-20 px-4">
-            <p className="text-5xl sm:text-6xl mb-4 animate-float">
-              {TABS[activeIndex].emoji}
-            </p>
+            <p className="text-5xl sm:text-6xl mb-4 animate-float">{TABS[activeIndex].emoji}</p>
             <h3 className="font-cute text-lg sm:text-xl text-fufu-text">
               {TABS[activeIndex].label}还没有热榜数据～
             </h3>
@@ -275,10 +302,7 @@ export default function RankingPage() {
               多浏览一些文章，热度数据就会自动生成啦 🎵
             </p>
             <div className="mt-4 flex items-center justify-center gap-2">
-              <Link
-                to="/articles"
-                className="fufu-btn-primary text-xs sm:text-sm"
-              >
+              <Link to="/articles" className="fufu-btn-primary text-xs sm:text-sm">
                 去逛逛首页
               </Link>
             </div>

@@ -7,9 +7,11 @@ fufu新闻 - 评论数据模型
 - parent_id 为 NULL 的评论为顶级评论
 - parent_id 指向另一条评论的为回复
 """
-from sqlalchemy import String, Integer, DateTime, Text, ForeignKey, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime, timezone
+
+from sqlalchemy import DateTime, ForeignKey, Integer, Text, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column
+
 from app.core.database import Base
 
 

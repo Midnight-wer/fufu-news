@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { folderApi, type Folder, type FolderArticles } from '../api/folders';
+import { unwrapOr } from '../api/unwrap';
 
 /** 获取所有文件夹列表 */
 export function useFolders() {
@@ -7,7 +8,8 @@ export function useFolders() {
     queryKey: ['folders'],
     queryFn: async () => {
       const res = await folderApi.list();
-      return (res.data || []) as Folder[];
+      // api 层已解包；这里再兜一层，保证列表一律是数组
+      return unwrapOr<Folder[]>(res, []);
     },
     placeholderData: [],
   });
@@ -20,7 +22,12 @@ export function useFolderArticles(folderId: number | null, page = 1, pageSize = 
     queryFn: async () => {
       if (!folderId) return { items: [], total: 0, page: 1, page_size: pageSize };
       const res = await folderApi.listArticles(folderId, page, pageSize);
-      return (res.data || { items: [], total: 0, page: 1, page_size: pageSize }) as FolderArticles;
+      return unwrapOr<FolderArticles>(res, {
+        items: [],
+        total: 0,
+        page: 1,
+        page_size: pageSize,
+      });
     },
     enabled: !!folderId,
     placeholderData: { items: [], total: 0, page: 1, page_size: 20 },
@@ -43,8 +50,15 @@ export function useCreateFolder() {
 export function useUpdateFolder() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...data }: { id: number; name?: string; icon?: string; is_public?: boolean }) =>
-      folderApi.update(id, data),
+    mutationFn: ({
+      id,
+      ...data
+    }: {
+      id: number;
+      name?: string;
+      icon?: string;
+      is_public?: boolean;
+    }) => folderApi.update(id, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['folders'] });
     },
@@ -93,8 +107,15 @@ export function useRemoveFromFolder() {
 export function useMoveArticle() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ articleId, fromFolderId, toFolderId }: { articleId: number; fromFolderId: number; toFolderId: number }) =>
-      folderApi.moveArticle(articleId, fromFolderId, toFolderId),
+    mutationFn: ({
+      articleId,
+      fromFolderId,
+      toFolderId,
+    }: {
+      articleId: number;
+      fromFolderId: number;
+      toFolderId: number;
+    }) => folderApi.moveArticle(articleId, fromFolderId, toFolderId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['folders'] });
       qc.invalidateQueries({ queryKey: ['articles'] });

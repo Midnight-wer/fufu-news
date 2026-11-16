@@ -4,9 +4,11 @@ fufu新闻 - 用户数据模型
 定义 User（用户）ORM 模型。
 每个用户拥有唯一的用户名、bcrypt 哈希密码和 JSON 格式的个性化设置。
 """
-from sqlalchemy import String, Integer, JSON, DateTime
-from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime, timezone
+
+from sqlalchemy import JSON, DateTime, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column
+
 from app.core.database import Base
 
 

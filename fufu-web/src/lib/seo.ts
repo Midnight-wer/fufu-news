@@ -16,7 +16,8 @@ interface SEOMeta {
 }
 
 const DEFAULT_SITE_NAME = 'fufu新闻';
-const DEFAULT_DESCRIPTION = '甜系二次元风格的新闻阅读器 — 初音未来主题 · RSS 聚合 · AI 摘要 · 深度解读';
+const DEFAULT_DESCRIPTION =
+  '甜系二次元风格的新闻阅读器 — 初音未来主题 · RSS 聚合 · AI 摘要 · 深度解读';
 const DEFAULT_IMAGE = ''; // 可替换为默认 OG 图 URL
 
 /**
@@ -61,6 +62,19 @@ export function setDocumentTitle(title: string): void {
 }
 
 /**
+ * 设置 canonical 链接
+ */
+function setCanonical(url: string): void {
+  let link = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
+  if (!link) {
+    link = document.createElement('link');
+    link.setAttribute('rel', 'canonical');
+    document.head.appendChild(link);
+  }
+  link.setAttribute('href', url);
+}
+
+/**
  * 设置文章的 SEO 元数据（用于社交分享预览）
  */
 export function setArticleSEO(meta: SEOMeta): void {
@@ -70,8 +84,10 @@ export function setArticleSEO(meta: SEOMeta): void {
   const image = meta.image || DEFAULT_IMAGE;
   const siteName = meta.siteName || DEFAULT_SITE_NAME;
 
-  // 页面标题
+  // 页面标题与搜索元信息
   setDocumentTitle(title);
+  setMeta('description', description, true);
+  setCanonical(url);
 
   // Open Graph
   setOG('title', title);
@@ -99,6 +115,8 @@ export function setArticleSEO(meta: SEOMeta): void {
  */
 export function resetSEO(): void {
   setDocumentTitle('');
+  setMeta('description', DEFAULT_DESCRIPTION, true);
+  setCanonical(window.location.origin);
   setOG('title', DEFAULT_SITE_NAME);
   setOG('description', DEFAULT_DESCRIPTION);
   setOG('url', window.location.origin);

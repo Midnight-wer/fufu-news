@@ -57,9 +57,8 @@ export async function fetchAggregatedView(
   articleId: number,
   limit: number = 4,
 ): Promise<AggregatedResponse> {
-  const { data } = await client.get<AggregatedResponse>(
-    `/articles/${articleId}/aggregated`,
-    { params: { limit } },
-  );
+  const { data } = await client.get<AggregatedResponse>(`/articles/${articleId}/aggregated`, {
+    params: { limit },
+  });
   return data;
 }

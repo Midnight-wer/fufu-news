@@ -9,24 +9,19 @@ fufu新闻 - 个性化推荐接口
 - GET /category/{category} → 特定分类下的趋势文章
 """
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Query
+
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.models.user import User
-from app.schemas.recommendation import (
-    RecommendationItem,
-    PersonalizedResponse,
-    SimilarResponse,
-    TrendingResponse,
-)
-from app.schemas.response import success, error
-from app.api.deps import get_current_user
+from app.schemas.response import error, success
 from app.services.recommender import (
+    get_category_recommendations,
     get_personalized_recommendations,
     get_similar_articles,
     get_trending_articles,
-    get_category_recommendations,
 )
 
 logger = logging.getLogger("fufu.recommendations")

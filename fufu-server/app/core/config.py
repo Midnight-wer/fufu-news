@@ -4,8 +4,9 @@ fufu新闻 - 核心配置
 应用全局配置管理，使用 pydantic-settings 从环境变量/.env 文件加载配置。
 所有配置项通过 settings 单例全局访问。
 """
-from pydantic_settings import BaseSettings
 from pathlib import Path
+
+from pydantic_settings import BaseSettings
 
 # 项目根目录：fufu-server/app/core/config.py → 向上 4 级到达项目根
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
@@ -39,7 +40,8 @@ class Settings(BaseSettings):
     app_version: str = "1.0.0"
 
     # 数据库配置
-    database_url: str = f"sqlite+aiosqlite:///{DATA_DIR}/fufu.db"
+    # 使用 as_posix() 统一为正斜杠，避免 Windows 反斜杠在 URL 中被转义
+    database_url: str = f"sqlite+aiosqlite:///{(DATA_DIR / 'fufu.db').as_posix()}"
 
     # 安全配置
     secret_key: str = "fufu-news-secret-key-change-in-production"  # 生产环境务必修改
@@ -75,11 +77,55 @@ class Settings(BaseSettings):
     anti_crawl_enabled: bool = True          # 是否启用反爬虫检测
     anti_crawl_block_duration_hours: int = 24  # 封禁时长（小时）
 
+    # CORS 配置（不再使用 allow_origins=["*"] + credentials 的错误组合）
+    cors_origins: str = (
+        "http://localhost:3000,http://127.0.0.1:3000,"
+        "http://localhost:5173,http://127.0.0.1:5173"
+    )
+
+    # AI 自定义 base_url 的域名白名单（SSRF 防护 + 防止服务端 Key 外泄）
+    # 支持精确域名或 *.example.com 后缀匹配
+    ai_allowed_hosts: str = (
+        "api.deepseek.com,api.openai.com,api.moonshot.cn,"
+        "open.bigmodel.cn,dashscope.aliyuncs.com,localhost,127.0.0.1"
+    )
+
+    # 未捕获异常是否把摘要回传给前端（生产建议 False）
+    expose_error_detail: bool = True
+
+    # 是否由后端托管已构建的前端产物（需先 npm run build）。
+    # 默认 False：开发态前端由 Vite 独立运行在 3000，避免误挂载过期的 dist。
+    serve_static: bool = False
+
+    # 后端监听端口（供 python -m app.main 直启时使用，与 vite proxy / launch.py 保持一致）
+    server_port: int = 8800
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        """把逗号分隔的 CORS 配置解析成列表。"""
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def ai_allowed_hosts_list(self) -> list[str]:
+        """把逗号分隔的 AI 域名白名单解析成列表。"""
+        return [h.strip() for h in self.ai_allowed_hosts.split(",") if h.strip()]
+
+    @property
+    def using_default_secret(self) -> bool:
+        """是否仍在使用默认/示例 JWT 密钥（仅用于启动告警，不改变行为）。"""
+        weak = {
+            "fufu-news-secret-key-change-in-production",
+            "change-me-to-a-random-string",
+        }
+        return self.secret_key in weak
+
     class Config:
         """
         Pydantic 配置——指定从 .env 文件读取环境变量。
+
+        注意：env_file 使用绝对路径，避免在非 fufu-server 目录下启动时加载不到 .env。
         """
-        env_file = ".env"  # 环境变量文件名
+        env_file = str(Path(__file__).resolve().parent.parent.parent / ".env")
         env_file_encoding = "utf-8"  # 文件编码
 
 

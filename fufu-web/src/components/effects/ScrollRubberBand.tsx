@@ -21,10 +21,7 @@ interface ScrollRubberBandProps {
  *   ensuring at most one queued reset per frame.
  * - Proper cleanup: all listeners, rAFs, and the lock are reset on unmount.
  */
-export default function ScrollRubberBand({
-  children,
-  scrollContainerRef,
-}: ScrollRubberBandProps) {
+export default function ScrollRubberBand({ children, scrollContainerRef }: ScrollRubberBandProps) {
   const intensity = useSettingsStore((s) => s.settings.effectIntensity);
   const factor = intensity / 100;
   const maxOverscroll = anim.scrollRubberBand.maxOverscroll * factor;
@@ -52,8 +49,7 @@ export default function ScrollRubberBand({
       const atTop = scrollTop <= 0;
       const atBottom = scrollTop + clientHeight >= scrollHeight - 1;
 
-      const isOverscrolling =
-        (atTop && e.deltaY < 0) || (atBottom && e.deltaY > 0);
+      const isOverscrolling = (atTop && e.deltaY < 0) || (atBottom && e.deltaY > 0);
 
       if (!isOverscrolling) return;
 
@@ -65,10 +61,7 @@ export default function ScrollRubberBand({
 
       lockRef.current.acquire('rubber');
 
-      const overscroll = Math.max(
-        -maxOverscroll,
-        Math.min(maxOverscroll, -e.deltaY * 0.3),
-      );
+      const overscroll = Math.max(-maxOverscroll, Math.min(maxOverscroll, -e.deltaY * 0.3));
       y.set(overscroll);
 
       // Schedule spring-back via rAF, then release lock after spring settles
@@ -80,8 +73,7 @@ export default function ScrollRubberBand({
 
     const onScroll = () => {
       stateRef.current.atTop = el.scrollTop <= 0;
-      stateRef.current.atBottom =
-        el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+      stateRef.current.atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
     };
 
     // passive: false on wheel so we can call preventDefault()

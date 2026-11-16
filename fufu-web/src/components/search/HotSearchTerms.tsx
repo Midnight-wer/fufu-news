@@ -1,15 +1,21 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Fire } from '@phosphor-icons/react';
-import client from '../../api/client';
+import { fetchHotSearchTerms } from '../../api/search';
 
 interface HotSearchTermsProps {
   onTermClick: (term: string) => void;
 }
 
 const FALLBACK_TERMS = [
-  'AI 人工智能', '芯片制裁', '新番推荐', '游戏评测',
-  '设计趋势', '科技新闻', '前端开发', '开源项目',
+  'AI 人工智能',
+  '芯片制裁',
+  '新番推荐',
+  '游戏评测',
+  '设计趋势',
+  '科技新闻',
+  '前端开发',
+  '开源项目',
 ];
 
 export default function HotSearchTerms({ onTermClick }: HotSearchTermsProps) {
@@ -21,12 +27,9 @@ export default function HotSearchTerms({ onTermClick }: HotSearchTermsProps) {
 
     async function fetchHotTerms() {
       try {
-        const { data } = await client.get('/search/hot');
-        if (!cancelled && data?.data?.length > 0) {
-          setTerms(data.data.slice(0, 8));
-        } else if (!cancelled) {
-          setTerms(FALLBACK_TERMS);
-        }
+        const list = await fetchHotSearchTerms(8);
+        if (cancelled) return;
+        setTerms(list.length > 0 ? list.slice(0, 8) : FALLBACK_TERMS);
       } catch {
         if (!cancelled) setTerms(FALLBACK_TERMS);
       } finally {
@@ -35,7 +38,9 @@ export default function HotSearchTerms({ onTermClick }: HotSearchTermsProps) {
     }
 
     fetchHotTerms();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (loading) {

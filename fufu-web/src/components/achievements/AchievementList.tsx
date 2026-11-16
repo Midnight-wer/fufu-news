@@ -40,10 +40,17 @@ export default function AchievementList() {
     <div className="space-y-6">
       {Object.entries(grouped).map(([cat, items]) => (
         <div key={cat}>
-          <h4 className="font-cute text-sm text-fufu-text-light mb-3">{CATEGORY_NAMES[cat] || cat}</h4>
+          <h4 className="font-cute text-sm text-fufu-text-light mb-3">
+            {CATEGORY_NAMES[cat] || cat}
+          </h4>
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
             {items.map((item, i) => (
-              <motion.div key={item.key} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+              <motion.div
+                key={item.key}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05 }}
+              >
                 <AchievementBadge item={item} />
               </motion.div>
             ))}

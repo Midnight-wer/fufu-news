@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
-import { Clock, Trash, ArrowUpRight, Warning, X } from '@phosphor-icons/react';
+import { Clock, Trash, Warning, X } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useHistory, useDeleteHistoryItem, useClearHistory } from '../hooks/useHistory';
 import type { HistoryItem } from '../api/history';
 
@@ -42,11 +42,6 @@ function formatTime(dateStr: string): string {
   return `${hours}:${minutes}`;
 }
 
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return `${d.getMonth() + 1}月${d.getDate()}日`;
-}
-
 function formatDuration(seconds: number): string {
   if (!seconds || seconds <= 0) return '';
   if (seconds < 60) return `${seconds}秒`;
@@ -67,9 +62,12 @@ const itemVariants = {
 function HistoryCard({
   item,
   onDelete,
+  deleting = false,
 }: {
   item: HistoryItem;
   onDelete: (id: number) => void;
+  /** 正在删除中 —— 之前 deletingIds 只写不读，删除按钮点了没有任何反馈 */
+  deleting?: boolean;
 }) {
   const navigate = useNavigate();
 
@@ -104,28 +102,28 @@ function HistoryCard({
           {/* Delete button */}
           <button
             onClick={() => onDelete(item.article_id)}
-            className="flex-shrink-0 p-1.5 rounded-fufu text-fufu-text-muted hover:text-fufu-error hover:bg-fufu-error-light/20 opacity-0 group-hover:opacity-100 transition-all"
-            title="删除此记录"
+            disabled={deleting}
+            aria-label="删除此记录"
+            className={`flex-shrink-0 p-1.5 rounded-fufu text-fufu-text-muted hover:text-fufu-error hover:bg-fufu-error-light/20 transition-all ${
+              deleting ? 'opacity-100 cursor-wait' : 'opacity-0 group-hover:opacity-100'
+            }`}
+            title={deleting ? '删除中…' : '删除此记录'}
           >
-            <X size={16} />
+            <X size={16} className={deleting ? 'animate-spin' : ''} />
           </button>
         </div>
 
         {/* Meta info */}
         <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs font-body text-fufu-text-muted">
           {item.source_name && (
-            <span className="fufu-tag bg-fufu-teal/8 text-fufu-teal-deep">
-              {item.source_name}
-            </span>
+            <span className="fufu-tag bg-fufu-teal/8 text-fufu-teal-deep">{item.source_name}</span>
           )}
           <span className="flex items-center gap-1">
             <Clock size={12} />
             {formatTime(item.read_at)}
           </span>
           {item.read_duration > 0 && (
-            <span className="text-fufu-text-light">
-              {formatDuration(item.read_duration)}
-            </span>
+            <span className="text-fufu-text-light">{formatDuration(item.read_duration)}</span>
           )}
         </div>
       </div>
@@ -143,9 +141,37 @@ export default function HistoryPage() {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [deletingIds, setDeletingIds] = useState<Set<number>>(new Set());
 
-  const items = data?.items || [];
+  // 修复：useHistory 的 queryKey 含 page，翻页时 react-query 会整体换掉数据，
+  // 用户看到的不是「加载更多」而是「第 1 页消失、第 2 页出现」。
+  // 这里把已加载的页累积起来，实现真正的追加加载。
+  const [accumulated, setAccumulated] = useState<HistoryItem[]>([]);
+  const seenIdsRef = useRef<Set<number>>(new Set());
+
+  useEffect(() => {
+    const fresh = data?.items || [];
+    if (fresh.length === 0) return;
+    let changed = false;
+    const next = [...accumulated];
+    for (const it of fresh) {
+      if (!seenIdsRef.current.has(it.article_id)) {
+        seenIdsRef.current.add(it.article_id);
+        next.push(it);
+        changed = true;
+      }
+    }
+    if (changed) setAccumulated(next);
+  }, [data?.items]);
+
+  // 清空历史后重置累积列表
+  const resetAccumulated = useCallback(() => {
+    setAccumulated([]);
+    seenIdsRef.current = new Set();
+    setPage(1);
+  }, []);
+
+  const items = accumulated.length > 0 ? accumulated : data?.items || [];
   const total = data?.total || 0;
-  const hasMore = page * 20 < total;
+  const hasMore = items.length < total;
 
   // Group items by date
   const grouped: Record<string, HistoryItem[]> = {};
@@ -161,6 +187,9 @@ export default function HistoryPage() {
     setDeletingIds((prev) => new Set(prev).add(articleId));
     try {
       deleteItem.mutate(articleId);
+      // 同步从累积列表里移除，避免删掉后仍留在页面上
+      setAccumulated((prev) => prev.filter((i) => i.article_id !== articleId));
+      seenIdsRef.current.delete(articleId);
     } finally {
       setTimeout(() => {
         setDeletingIds((prev) => {
@@ -174,6 +203,7 @@ export default function HistoryPage() {
 
   const handleClearAll = () => {
     clearAll.mutate();
+    resetAccumulated();
     setShowClearConfirm(false);
   };
 
@@ -271,6 +301,7 @@ export default function HistoryPage() {
                       key={item.article_id}
                       item={item}
                       onDelete={handleDelete}
+                      deleting={deletingIds.has(item.article_id)}
                     />
                   ))}
                 </div>

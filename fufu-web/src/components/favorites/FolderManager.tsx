@@ -1,13 +1,38 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, PencilSimple, TrashSimple, X, FolderSimple, Check, CaretDown } from '@phosphor-icons/react';
+import {
+  Plus,
+  PencilSimple,
+  TrashSimple,
+  X,
+  FolderSimple,
+  Check,
+  CaretDown,
+} from '@phosphor-icons/react';
 import { type Folder } from '../../api/folders';
 import { useCreateFolder, useUpdateFolder, useDeleteFolder } from '../../hooks/useFolders';
 
 const EMOJI_OPTIONS = [
-  '📁', '💻', '🎮', '🎨', '🌸', '📰', '🌿', '💡',
-  '❤️', '⭐', '📌', '🔥', '🎵', '📚', '🍰', '🎯',
-  '✨', '💎', '🌈', '🎪',
+  '📁',
+  '💻',
+  '🎮',
+  '🎨',
+  '🌸',
+  '📰',
+  '🌿',
+  '💡',
+  '❤️',
+  '⭐',
+  '📌',
+  '🔥',
+  '🎵',
+  '📚',
+  '🍰',
+  '🎯',
+  '✨',
+  '💎',
+  '🌈',
+  '🎪',
 ];
 
 interface FolderManagerProps {
@@ -16,7 +41,11 @@ interface FolderManagerProps {
   onSelectFolder: (folderId: number | null) => void;
 }
 
-export default function FolderManager({ folders, activeFolderId, onSelectFolder }: FolderManagerProps) {
+export default function FolderManager({
+  folders,
+  activeFolderId,
+  onSelectFolder,
+}: FolderManagerProps) {
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
   const [newIcon, setNewIcon] = useState('📁');
@@ -60,7 +89,7 @@ export default function FolderManager({ folders, activeFolderId, onSelectFolder 
           setNewPublic(false);
           setShowCreate(false);
         },
-      }
+      },
     );
   };
 
@@ -74,7 +103,7 @@ export default function FolderManager({ folders, activeFolderId, onSelectFolder 
           setEditName('');
           setEditIcon('📁');
         },
-      }
+      },
     );
   };
 
@@ -125,7 +154,10 @@ export default function FolderManager({ folders, activeFolderId, onSelectFolder 
               transition={{ duration: 0.2 }}
               onClick={() => onSelectFolder(folder.id)}
               onDoubleClick={() => openEdit(folder)}
-              onContextMenu={(e) => { e.preventDefault(); openEdit(folder); }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                openEdit(folder);
+              }}
               className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-fufu-btn font-cute text-sm transition-all border-2 group relative ${
                 activeFolderId === folder.id
                   ? 'border-fufu-teal bg-fufu-teal-soft/10 text-fufu-teal-deep shadow-fufu'
@@ -137,7 +169,10 @@ export default function FolderManager({ folders, activeFolderId, onSelectFolder 
               <span className="text-xs opacity-50 font-body">({folder.article_count})</span>
               {/* 编辑小按钮 */}
               <span
-                onClick={(e) => { e.stopPropagation(); openEdit(folder); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openEdit(folder);
+                }}
                 className="ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-fufu-text-muted hover:text-fufu-teal"
               >
                 <PencilSimple size={12} />
@@ -175,13 +210,18 @@ export default function FolderManager({ folders, activeFolderId, onSelectFolder 
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-cute text-lg text-fufu-text">📁 新建文件夹</h3>
-                <button onClick={() => setShowCreate(false)} className="text-fufu-text-muted hover:text-fufu-pink transition-colors">
+                <button
+                  onClick={() => setShowCreate(false)}
+                  className="text-fufu-text-muted hover:text-fufu-pink transition-colors"
+                >
                   <X size={20} />
                 </button>
               </div>
 
               {/* 名称输入 */}
-              <label className="block font-body text-sm text-fufu-text-light mb-1.5">文件夹名称</label>
+              <label className="block font-body text-sm text-fufu-text-light mb-1.5">
+                文件夹名称
+              </label>
               <input
                 type="text"
                 value={newName}
@@ -193,7 +233,9 @@ export default function FolderManager({ folders, activeFolderId, onSelectFolder 
               />
 
               {/* 图标选择 */}
-              <label className="block font-body text-sm text-fufu-text-light mb-1.5 mt-4">文件夹图标</label>
+              <label className="block font-body text-sm text-fufu-text-light mb-1.5 mt-4">
+                文件夹图标
+              </label>
               <div ref={emojiRef} className="relative">
                 <button
                   onClick={() => setShowEmojiPicker(!showEmojiPicker)}
@@ -208,9 +250,14 @@ export default function FolderManager({ folders, activeFolderId, onSelectFolder 
                     {EMOJI_OPTIONS.map((emoji) => (
                       <button
                         key={emoji}
-                        onClick={() => { setNewIcon(emoji); setShowEmojiPicker(false); }}
+                        onClick={() => {
+                          setNewIcon(emoji);
+                          setShowEmojiPicker(false);
+                        }}
                         className={`w-10 h-10 flex items-center justify-center rounded-fufu text-lg transition-all ${
-                          newIcon === emoji ? 'bg-fufu-teal-soft/20 ring-2 ring-fufu-teal/30' : 'hover:bg-fufu-cream'
+                          newIcon === emoji
+                            ? 'bg-fufu-teal-soft/20 ring-2 ring-fufu-teal/30'
+                            : 'hover:bg-fufu-cream'
                         }`}
                       >
                         {emoji}
@@ -276,13 +323,18 @@ export default function FolderManager({ folders, activeFolderId, onSelectFolder 
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-cute text-lg text-fufu-text">✏️ 编辑文件夹</h3>
-                <button onClick={() => setEditingFolder(null)} className="text-fufu-text-muted hover:text-fufu-pink transition-colors">
+                <button
+                  onClick={() => setEditingFolder(null)}
+                  className="text-fufu-text-muted hover:text-fufu-pink transition-colors"
+                >
                   <X size={20} />
                 </button>
               </div>
 
               {/* 名称 */}
-              <label className="block font-body text-sm text-fufu-text-light mb-1.5">文件夹名称</label>
+              <label className="block font-body text-sm text-fufu-text-light mb-1.5">
+                文件夹名称
+              </label>
               <input
                 type="text"
                 value={editName}
@@ -293,7 +345,9 @@ export default function FolderManager({ folders, activeFolderId, onSelectFolder 
               />
 
               {/* 图标 */}
-              <label className="block font-body text-sm text-fufu-text-light mb-1.5 mt-4">图标</label>
+              <label className="block font-body text-sm text-fufu-text-light mb-1.5 mt-4">
+                图标
+              </label>
               <div ref={editEmojiRef} className="relative">
                 <button
                   onClick={() => setShowEditEmojiPicker(!showEditEmojiPicker)}
@@ -308,9 +362,14 @@ export default function FolderManager({ folders, activeFolderId, onSelectFolder 
                     {EMOJI_OPTIONS.map((emoji) => (
                       <button
                         key={emoji}
-                        onClick={() => { setEditIcon(emoji); setShowEditEmojiPicker(false); }}
+                        onClick={() => {
+                          setEditIcon(emoji);
+                          setShowEditEmojiPicker(false);
+                        }}
                         className={`w-10 h-10 flex items-center justify-center rounded-fufu text-lg transition-all ${
-                          editIcon === emoji ? 'bg-fufu-teal-soft/20 ring-2 ring-fufu-teal/30' : 'hover:bg-fufu-cream'
+                          editIcon === emoji
+                            ? 'bg-fufu-teal-soft/20 ring-2 ring-fufu-teal/30'
+                            : 'hover:bg-fufu-cream'
                         }`}
                       >
                         {emoji}
@@ -322,7 +381,10 @@ export default function FolderManager({ folders, activeFolderId, onSelectFolder 
 
               {/* 删除按钮 */}
               <button
-                onClick={() => { setEditingFolder(null); setDeleteConfirm(editingFolder); }}
+                onClick={() => {
+                  setEditingFolder(null);
+                  setDeleteConfirm(editingFolder);
+                }}
                 className="flex items-center gap-2 mt-5 px-4 py-2 rounded-fufu-btn font-cute text-sm text-fufu-error bg-fufu-error-light/20 hover:bg-fufu-error-light/40 transition-all"
               >
                 <TrashSimple size={16} />
@@ -370,8 +432,11 @@ export default function FolderManager({ folders, activeFolderId, onSelectFolder 
               <p className="text-5xl text-center mb-4">🗑️</p>
               <h3 className="font-cute text-lg text-fufu-text text-center">确定要删除吗？</h3>
               <p className="font-body text-sm text-fufu-text-light text-center mt-2 leading-relaxed">
-                删除文件夹 <span className="text-fufu-pink font-cute">{deleteConfirm.icon} {deleteConfirm.name}</span> 后，
-                里面的文章不会被删除，只是取消分类哦～
+                删除文件夹{' '}
+                <span className="text-fufu-pink font-cute">
+                  {deleteConfirm.icon} {deleteConfirm.name}
+                </span>{' '}
+                后， 里面的文章不会被删除，只是取消分类哦～
               </p>
               <div className="flex items-center justify-center gap-3 mt-5">
                 <button

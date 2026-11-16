@@ -1,4 +1,5 @@
 import client from './client';
+import { unwrapOr } from './unwrap';
 
 export interface HistoryItem {
   article_id: number;
@@ -30,10 +31,10 @@ export async function fetchHistory(page = 1, pageSize = 20): Promise<HistoryResp
   const { data } = await client.get('/history', {
     params: { page, page_size: pageSize },
   });
-  // Backend wraps in { code: 200, data: {...}, message: "ok" }
-  // Unwrap to get the actual history response
-  const inner = data?.data || data;
-  return (inner && typeof inner === 'object' && 'items' in inner)
+  // 后端是 { code, data, message } 信封，统一解包。
+  // 保留形状校验：error() 返回时 data 是空数组，不能当成 HistoryResponse 用。
+  const inner = unwrapOr<unknown>(data, null);
+  return inner && typeof inner === 'object' && !Array.isArray(inner) && 'items' in inner
     ? (inner as HistoryResponse)
     : EMPTY_HISTORY_RESPONSE;
 }

@@ -9,14 +9,15 @@ fufu新闻 - OPML 导入导出接口
 OPML（Outline Processor Markup Language）是 RSS 阅读器之间
 通用的订阅源交换格式。
 """
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import PlainTextResponse
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.models.source import Source
 from app.models.user import User
-from app.api.deps import get_current_user
 from app.services.opml import export_opml, import_opml
 
 # 创建 OPML 路由实例
@@ -86,14 +87,14 @@ async def import_sources(
     try:
         content = await file.read()
         xml_data = content.decode("utf-8")
-    except UnicodeDecodeError:
-        raise HTTPException(status_code=400, detail="文件编码不是 UTF-8 呢，转换一下再试试～")
+    except UnicodeDecodeError as e:
+        raise HTTPException(status_code=400, detail="文件编码不是 UTF-8 呢，转换一下再试试～") from e
 
     # 解析 OPML 并导入
     try:
         result = await import_opml(xml_data, db)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
     # 构建友好的返回消息
     if result["created"] == 0 and result["skipped"] == 0:

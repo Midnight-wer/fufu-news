@@ -18,11 +18,10 @@ fufu新闻 - API 频率限制中间件
 - Retry-After: 被限流时建议等待秒数
 """
 
-import time
 import asyncio
 import logging
+import time
 from collections import defaultdict
-from typing import Optional
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -51,7 +50,7 @@ class RateLimiter:
         self,
         requests_per_minute: int = 60,
         burst_size: int = 10,
-        whitelist: Optional[list[str]] = None,
+        whitelist: list[str] | None = None,
     ):
         """
         Args:
@@ -183,7 +182,7 @@ class RateLimiter:
 
 # ========== 全局频率限制器实例 ==========
 # 从 settings 读取配置，在应用启动时初始化
-_rate_limiter: Optional[RateLimiter] = None
+_rate_limiter: RateLimiter | None = None
 
 
 def get_rate_limiter() -> RateLimiter:

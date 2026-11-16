@@ -8,23 +8,34 @@ fufu新闻 - 文章接口
 - PATCH /articles/{id}         → 更新文章状态（已读/收藏/进度等）
 - GET  /articles/web-search   → 旧版全网搜索兼容端点
 """
+import logging
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
+from sqlalchemy import String, case, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, delete
-from sqlalchemy.orm import joinedload
+
+from app.api.deps import get_current_user
+from app.core.categories import CATEGORY_KEYWORDS
 from app.core.database import get_db
 from app.models.article import Article
+from app.models.poll import POLL_OPTIONS, ArticlePoll
 from app.models.source import Source
 from app.models.user import User
-from app.schemas.article import ArticleUpdate, ArticleResponse, ArticleListResponse
-from app.api.deps import get_current_user
-from app.services.search import search_ddgs
-from app.services.aggregator import find_related_from_other_sources
 from app.schemas.aggregation import AggregatedResponse
+from app.schemas.article import ArticleListResponse, ArticleResponse, ArticleUpdate
+from app.schemas.response import success
+from app.services.aggregator import find_related_from_other_sources
+from app.services.search import search_ddgs
+from app.services.stats import sync_collect_count
 
 # 创建文章路由实例
 router = APIRouter(tags=["文章"])
+
+logger = logging.getLogger("fufu.api.articles")
+
+
 
 
 # ========== 旧版全网搜索兼容（转发到新端点） ==========
@@ -76,6 +87,63 @@ def _since_cutoff(since: str) -> datetime | None:
     return None
 
 
+@router.get("/categories")
+async def list_categories(
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
+):
+    """
+    各分类的文章数量——GET /api/v1/articles/categories
+
+    前端分类按钮上挂着"该分类有几篇"的小徽标。之前这个数字是在
+    **当前这一页**的 20 条里数出来的，翻到第 2 页数字就变了，
+    看起来像随机跳动的假数据。这里改成一次 SQL 聚合出全库真实数量。
+
+    注意顺序：`/categories` 必须定义在 `/{article_id}` 之前，
+    否则会被当成 article_id="categories" 吃掉。
+    """
+    total = (await db.execute(select(func.count()).select_from(Article))).scalar() or 0
+
+    cases = []
+    for name, keywords in CATEGORY_KEYWORDS.items():
+        cases.append(
+            func.sum(
+                case((or_(*_category_conditions(keywords)), 1), else_=0)
+            ).label(name)
+        )
+
+    row = (await db.execute(
+        select(*cases).select_from(Article).join(
+            Source, Source.id == Article.source_id, isouter=True
+        )
+    )).first()
+
+    counts: dict[str, int] = {"all": int(total)}
+    for i, name in enumerate(CATEGORY_KEYWORDS):
+        counts[name] = int(row[i] or 0) if row else 0
+
+    return success(counts)
+
+
+def _category_conditions(keywords: list[str]):
+    """
+    把分类关键词列表翻译成 SQL 条件。
+
+    分类命中两个来源：
+      - 订阅源的 folder（Source.folder）
+      - 文章自己的 AI 标签（Article.tags，JSON 数组，SQLite 里以文本存储）
+
+    tags 用 LIKE '%"关键词"%' 匹配，是因为 JSON 列在 SQLite 中没有原生
+    数组包含操作符；JSON 序列化后形如 ["动漫", "科技"]，带引号的模糊匹配
+    可以避免「科技」误命中「科技圈」之外的子串问题（引号天然做了边界）。
+    """
+    conds = []
+    for kw in keywords:
+        conds.append(Source.folder == kw)
+        conds.append(cast(Article.tags, String).like(f'%"{kw}"%'))
+    return conds
+
+
 @router.get("", response_model=ArticleListResponse)
 async def list_articles(
     page: int = Query(default=1, ge=1),
@@ -86,6 +154,7 @@ async def list_articles(
     source_id: int | None = None,
     sort: str = Query(default="latest", pattern=r"^(latest|random)$"),
     since: str = Query(default="all", pattern=r"^(all|24h|3d|7d)$"),
+    category: str | None = Query(default=None, max_length=50),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(get_current_user),
 ):
@@ -103,6 +172,7 @@ async def list_articles(
         source_id: 按订阅源 ID 筛选
         sort: 排序方式（"latest" 按抓取时间降序 / "random" 随机排序）
         since: 时间范围筛选（"24h"/"3d"/"7d"/"all"）
+        category: 分类筛选（单个分类名，如 动漫/游戏/科技/设计/综合）
 
     返回:
         ArticleListResponse: 包含 articles 列表和分页信息
@@ -119,6 +189,17 @@ async def list_articles(
         q = q.where(Article.is_later == is_later)
     if source_id is not None:
         q = q.where(Article.source_id == source_id)
+
+    # 分类筛选：需要 join 订阅源才能拿到 folder
+    if category:
+        keywords = CATEGORY_KEYWORDS.get(category)
+        if not keywords:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"不支持的分类：{category}",
+            )
+        q = q.join(Source, Source.id == Article.source_id, isouter=True)
+        q = q.where(or_(*_category_conditions(keywords)))
 
     # 时间范围筛选
     cutoff = _since_cutoff(since)
@@ -354,10 +435,162 @@ async def update_article(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="找不到这篇文章呢～")
 
     # 将请求中的非空字段更新到文章对象上
-    for key, val in data.model_dump(exclude_unset=True).items():
+    changed = data.model_dump(exclude_unset=True)
+    for key, val in changed.items():
         setattr(article, key, val)
     await db.flush()
     await db.refresh(article)
+
+    # 收藏状态变化时同步收藏数。
+    # 修复：article_stats.collect_count 此前只在创建统计行瞬间赋值一次，
+    # 之后收藏/取消收藏都不更新，导致排行榜 ⭐ 收藏数永远失真、
+    # 热度公式里 10% 的收藏权重形同虚设。
+    if "is_favorite" in changed:
+        await sync_collect_count(db, article.id, bool(changed["is_favorite"]))
+
+    logger.debug(
+        f"文章 {article_id} 状态更新: {', '.join(changed.keys()) or '无字段'}"
+    )
+
+    a = ArticleResponse.model_validate(article)
+
+    # 补上订阅源名称：PATCH 的返回体也要带 source_name，
+    # 否则前端更新单篇缓存后卡片上的来源标签会瞬间变空。
+    # （这里曾经漏了查询直接引用 src_row，导致每个 PATCH 都 NameError → 500）
+    src_row = (await db.execute(
+        select(Source.name, Source.folder).where(Source.id == article.source_id)
+    )).first()
+    if src_row:
+        a.source_name = src_row[0]
+        a.source_folder = src_row[1]
+    return a
+
+
+# ========== 文章立场投票 ==========
+
+
+@router.get("/{article_id}/poll")
+async def get_article_poll(
+    article_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    获取文章立场投票统计——GET /api/v1/articles/{id}/poll
+
+    原先这个「你怎么看？」投票是纯前端 localStorage 假数据：
+    换设备即丢失，且统计时没有按文章过滤（在第 5 篇投票，第 100 篇也会显示
+    "已有 1 人参与"）。现在改为真实落库统计。
+
+    返回:
+        data = { support, oppose, neutral, total, my_vote }
+    """
+    rows = (await db.execute(
+        select(ArticlePoll.option, func.count(ArticlePoll.id))
+        .where(ArticlePoll.article_id == article_id)
+        .group_by(ArticlePoll.option)
+    )).all()
+
+    counts = {"support": 0, "oppose": 0, "neutral": 0}
+    for option, n in rows:
+        if option in counts:
+            counts[option] = n
+
+    my_vote = (await db.execute(
+        select(ArticlePoll.option).where(
+            ArticlePoll.article_id == article_id,
+            ArticlePoll.user_id == current_user.id,
+        )
+    )).scalar_one_or_none()
+
+    return success({
+        **counts,
+        "total": sum(counts.values()),
+        "my_vote": my_vote,
+    })
+
+
+class PollVoteRequest(BaseModel):
+    """投票请求体。option 为 support / oppose / neutral，传 null 表示撤票。"""
+    option: str | None
+
+
+@router.post("/{article_id}/poll")
+async def vote_article_poll(
+    article_id: int,
+    body: PollVoteRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    提交/修改文章立场投票——POST /api/v1/articles/{id}/poll
+
+    一人一票（UNIQUE(article_id, user_id)）：重复投票视为改票，
+    传 `{"option": null}` 表示撤票。
+
+    异常:
+        HTTPException(404): 文章不存在
+        HTTPException(400): 选项不合法
+    """
+    article = (await db.execute(
+        select(Article.id).where(Article.id == article_id)
+    )).scalar_one_or_none()
+    if article is None:
+        raise HTTPException(status_code=404, detail="找不到这篇文章呢～")
+
+    option = body.option
+    if option is not None and option not in POLL_OPTIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"投票选项不合法，只能是 {list(POLL_OPTIONS)} 之一",
+        )
+
+    existing = (await db.execute(
+        select(ArticlePoll).where(
+            ArticlePoll.article_id == article_id,
+            ArticlePoll.user_id == current_user.id,
+        )
+    )).scalar_one_or_none()
+
+    if option is None:
+        # 撤票
+        if existing:
+            await db.delete(existing)
+            logger.info(f"用户 {current_user.username} 撤销了对文章 {article_id} 的投票")
+        return success({"voted": False}, message="已撤销投票～")
+
+    if existing:
+        existing.option = option
+        existing.updated_at = datetime.now(timezone.utc)
+        message = "已更新你的立场～"
+    else:
+        db.add(ArticlePoll(
+            article_id=article_id,
+            user_id=current_user.id,
+            option=option,
+        ))
+        message = "投票成功，谢谢你的一票～"
+
+    await db.flush()
+    logger.info(f"用户 {current_user.username} 对文章 {article_id} 投票: {option}")
+
+    # 返回最新统计，前端无需再发一次 GET
+    rows = (await db.execute(
+        select(ArticlePoll.option, func.count(ArticlePoll.id))
+        .where(ArticlePoll.article_id == article_id)
+        .group_by(ArticlePoll.option)
+    )).all()
+    counts = {"support": 0, "oppose": 0, "neutral": 0}
+    for opt, n in rows:
+        if opt in counts:
+            counts[opt] = n
+
+    return success({
+        **counts,
+        "total": sum(counts.values()),
+        "my_vote": option,
+        "voted": True,
+    }, message=message)
 
     # 获取关联订阅源信息
     src_row = (await db.execute(

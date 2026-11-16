@@ -5,6 +5,7 @@ fufu新闻 - 订阅源 Pydantic Schema
 用于订阅源的创建、更新和查询接口。
 """
 from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 

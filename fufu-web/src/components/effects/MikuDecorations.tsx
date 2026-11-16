@@ -1,7 +1,11 @@
 import { motion } from 'framer-motion';
+import { useSettingsStore } from '@/stores/settingsStore';
 
-/** 初音未来 Q 版装饰元素 — SVG 音符、耳机、话筒、星芒 */
+/** 初音未来 Q 版装饰元素 — SVG 音符、耳机、话筒、星芒
+ *  仅初音(miku)主题展示；切换奶咖/暗色主题时自动隐藏，避免装饰与主题脱节。 */
 export default function MikuDecorations() {
+  const theme = useSettingsStore((s) => s.settings.theme);
+  if (theme !== 'miku') return null;
   return (
     <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 0 }}>
       {/* 左上音符群 */}
@@ -67,8 +71,10 @@ export default function MikuDecorations() {
         transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut', delay: 0.5 }}
       >
         <svg width="36" height="36" viewBox="0 0 36 36" opacity="0.12">
-          <path d="M18 2 L21 14 L33 14 L23 22 L27 34 L18 26 L9 34 L13 22 L3 14 L15 14 Z"
-                fill="#00e5ff" />
+          <path
+            d="M18 2 L21 14 L33 14 L23 22 L27 34 L18 26 L9 34 L13 22 L3 14 L15 14 Z"
+            fill="#00e5ff"
+          />
         </svg>
       </motion.div>
 
@@ -78,7 +84,9 @@ export default function MikuDecorations() {
         animate={{ y: [0, 12, 0], rotate: [0, -8, 0] }}
         transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
       >
-        <span className="text-3xl music-note" style={{ color: '#00e5ff', opacity: 0.2 }}>♪</span>
+        <span className="text-3xl music-note" style={{ color: '#00e5ff', opacity: 0.2 }}>
+          ♪
+        </span>
       </motion.div>
 
       {/* 左下话筒 */}
@@ -105,9 +113,19 @@ export default function MikuDecorations() {
         <motion.span
           key={i}
           className="absolute text-lg font-serif"
-          style={{ left: pos.left, top: pos.top, color: i % 2 === 0 ? '#00e5ff' : '#ffb6c1', opacity: 0.12 }}
-          animate={{ y: [0, -14, 0], rotate: [0, (i % 2 === 0 ? 8 : -8), 0] }}
-          transition={{ duration: 4 + i * 0.4, repeat: Infinity, ease: 'easeInOut', delay: pos.delay }}
+          style={{
+            left: pos.left,
+            top: pos.top,
+            color: i % 2 === 0 ? '#00e5ff' : '#ffb6c1',
+            opacity: 0.12,
+          }}
+          animate={{ y: [0, -14, 0], rotate: [0, i % 2 === 0 ? 8 : -8, 0] }}
+          transition={{
+            duration: 4 + i * 0.4,
+            repeat: Infinity,
+            ease: 'easeInOut',
+            delay: pos.delay,
+          }}
         >
           {['♬', '♫', '♪', '♩', '🎵'][i]}
         </motion.span>

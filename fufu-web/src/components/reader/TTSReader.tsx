@@ -79,8 +79,14 @@ export default function TTSReader({ content, title }: TTSReaderProps) {
           <>
             <span className="flex items-center gap-0.5">
               <span className="w-1 h-4 bg-fufu-peach/60 rounded-full animate-pulse" />
-              <span className="w-1 h-3 bg-fufu-peach/40 rounded-full animate-pulse" style={{ animationDelay: '0.15s' }} />
-              <span className="w-1 h-5 bg-fufu-peach/50 rounded-full animate-pulse" style={{ animationDelay: '0.3s' }} />
+              <span
+                className="w-1 h-3 bg-fufu-peach/40 rounded-full animate-pulse"
+                style={{ animationDelay: '0.15s' }}
+              />
+              <span
+                className="w-1 h-5 bg-fufu-peach/50 rounded-full animate-pulse"
+                style={{ animationDelay: '0.3s' }}
+              />
             </span>
             正在读...
           </>

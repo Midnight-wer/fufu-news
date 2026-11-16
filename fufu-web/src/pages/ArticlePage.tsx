@@ -1,22 +1,41 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { Star, BookmarkSimple, ArrowLeft, Share, Sparkle, Tag, CaretDown, CaretUp, Robot, FolderSimple } from '@phosphor-icons/react';
+import { createPortal } from 'react-dom';
+import {
+  Star,
+  BookmarkSimple,
+  ArrowLeft,
+  Share,
+  Sparkle,
+  Tag,
+  CaretDown,
+  CaretUp,
+  Robot,
+} from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useArticle, useToggleFavorite, useToggleLater, useMarkRead } from '../hooks/useArticles';
+import {
+  useArticle,
+  useToggleFavorite,
+  useToggleLater,
+  useMarkRead,
+  useUpdateReadProgress,
+} from '../hooks/useArticles';
 import { useAISummarize, useAITag, useGenerateDeepSummary } from '../hooks/useAI';
 import { useRecordHit } from '../hooks/useRanking';
 import { useRecordRead } from '../hooks/useHistory';
-import { useEffect, useState, useMemo, useRef, useCallback, type MouseEvent } from 'react';
+import { useEffect, useState, useMemo, useRef, type MouseEvent } from 'react';
 import TTSReader from '../components/reader/TTSReader';
 import HeartBurst from '../components/effects/HeartBurst';
 import { useCompanionStore } from '../stores/companionStore';
 import { useCheckAchievement } from '../hooks/useAchievements';
 import { useFolders, useAddToFolder } from '../hooks/useFolders';
 import { useQuery } from '@tanstack/react-query';
-import client from '../api/client';
+import { fetchPoll, submitPoll, type PollOption, type PollResult } from '../api/articles';
+import { fetchSimilarArticles } from '../api/recommendations';
 import AggregatedView from '../components/common/AggregatedView';
 import CommentSection from '../components/comments/CommentSection';
 import ShareButton from '../components/common/ShareButton';
 import { setArticleSEO, resetSEO } from '../lib/seo';
+import { sanitizeHtml } from '../lib/sanitize';
 
 // ===== Animation variants =====
 const fadeInUp = {
@@ -61,90 +80,118 @@ function DeepSection({
   );
 }
 
-// ===== Poll helpers (client-side, localStorage) =====
-const POLL_KEY = 'fufu-poll-votes';
+// ===== 立场投票 =====
+// 修复：原先这里是纯 localStorage 假数据，换设备即丢失；
+// 更严重的是 getPollCounts() 遍历的是**全部文章**的投票记录、没有按 articleId 过滤，
+// 所以在第 5 篇投票，第 100 篇也会显示"已有 1 人参与"。
+// 现在改为调用真实的后端接口（article_poll 表，一人一票、可改票/撤票）。
 
-function getAllPollVotes(): Record<number, { option: 'support' | 'oppose' | 'neutral' }> {
-  try {
-    const raw = localStorage.getItem(POLL_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
+// PollOption / PollResult / fetchPoll / submitPoll 已下沉到 api/articles
 
-function getPollVote(articleId: number): 'support' | 'oppose' | 'neutral' | null {
-  const votes = getAllPollVotes();
-  return votes[articleId]?.option ?? null;
-}
-
-function setPollVote(articleId: number, option: 'support' | 'oppose' | 'neutral') {
-  const votes = getAllPollVotes();
-  votes[articleId] = { option };
-  localStorage.setItem(POLL_KEY, JSON.stringify(votes));
-}
-
-function getPollCounts(): { support: number; oppose: number; neutral: number } {
-  const votes = getAllPollVotes();
-  const counts = { support: 0, oppose: 0, neutral: 0 };
-  for (const entry of Object.values(votes)) {
-    if (entry?.option && entry.option in counts) {
-      counts[entry.option as keyof typeof counts]++;
-    }
-  }
-  return counts;
-}
-
-// ===== Poll component =====
 function ArticlePoll({ articleId }: { articleId: number }) {
-  const [myVote, setMyVote] = useState<'support' | 'oppose' | 'neutral' | null>(null);
-  const [hasVoted, setHasVoted] = useState(false);
+  const [myVote, setMyVote] = useState<PollOption | null>(null);
   const [counts, setCounts] = useState({ support: 0, oppose: 0, neutral: 0 });
+  const [total, setTotal] = useState(0);
+  const [loaded, setLoaded] = useState(false);
+  const [voting, setVoting] = useState<PollOption | null>(null);
 
   useEffect(() => {
-    const existing = getPollVote(articleId);
-    if (existing) {
-      setMyVote(existing);
-      setHasVoted(true);
-    }
-    setCounts(getPollCounts());
+    let cancelled = false;
+    setLoaded(false);
+    fetchPoll(articleId)
+      .then((r) => {
+        if (cancelled) return;
+        setCounts({ support: r.support, oppose: r.oppose, neutral: r.neutral });
+        setTotal(r.total);
+        setMyVote(r.my_vote);
+      })
+      .catch(() => {
+        /* 拉取失败时保持空票态，用户可以照常投票 */
+      })
+      .finally(() => {
+        if (!cancelled) setLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [articleId]);
 
-  const handleVote = (option: 'support' | 'oppose' | 'neutral') => {
-    setPollVote(articleId, option);
-    setMyVote(option);
-    setHasVoted(true);
-    setCounts(getPollCounts());
+  const handleVote = async (option: PollOption) => {
+    if (voting) return;
+    setVoting(option);
+    // 再次点击当前选项 = 撤票
+    const next = myVote === option ? null : option;
+    try {
+      const r = await submitPoll(articleId, next);
+      setCounts({ support: r.support, oppose: r.oppose, neutral: r.neutral });
+      setTotal(r.total);
+      setMyVote(r.my_vote);
+    } catch {
+      /* 投票失败不打断阅读，静默返回 */
+    } finally {
+      setVoting(null);
+    }
   };
 
-  const total = counts.support + counts.oppose + counts.neutral || 1;
+  const displayTotal = total || 1;
 
   const options = [
-    { key: 'support' as const, label: '支持', icon: '👍', color: '#39c5bb', bg: 'bg-fufu-soft-green/20 hover:bg-fufu-soft-green/40' },
-    { key: 'oppose' as const, label: '反对', icon: '👎', color: '#FF9E9E', bg: 'bg-fufu-error-light/20 hover:bg-fufu-error-light/40' },
-    { key: 'neutral' as const, label: '中立', icon: '🤔', color: '#A0B8C0', bg: 'bg-fufu-soft-purple/20 hover:bg-fufu-soft-purple/40' },
+    {
+      key: 'support' as const,
+      label: '支持',
+      icon: '👍',
+      color: 'rgb(var(--fufu-teal-deep))',
+      bg: 'bg-fufu-soft-green/20 hover:bg-fufu-soft-green/40',
+    },
+    {
+      key: 'oppose' as const,
+      label: '反对',
+      icon: '👎',
+      color: '#FF9E9E',
+      bg: 'bg-fufu-error-light/20 hover:bg-fufu-error-light/40',
+    },
+    {
+      key: 'neutral' as const,
+      label: '中立',
+      icon: '🤔',
+      color: '#A0B8C0',
+      bg: 'bg-fufu-soft-purple/20 hover:bg-fufu-soft-purple/40',
+    },
   ];
 
   return (
     <DeepSection icon="🤔" title="你怎么看？" delay={0.25}>
       <div className="space-y-3">
-        {!hasVoted ? (
-          <div className="flex flex-wrap gap-3">
-            {options.map((opt) => (
+        {/* 投票按钮：始终可见，点击当前选项可撤票 */}
+        <div className="flex flex-wrap gap-3">
+          {options.map((opt) => {
+            const isMine = myVote === opt.key;
+            return (
               <button
                 key={opt.key}
                 onClick={() => handleVote(opt.key)}
-                className={`flex items-center gap-2 px-5 py-3 rounded-fufu-btn font-cute text-sm transition-all border-2 border-transparent hover:shadow-fufu-hover ${opt.bg} text-fufu-text`}
+                disabled={voting !== null}
+                aria-pressed={isMine}
+                className={`flex items-center gap-2 px-5 py-3 rounded-fufu-btn font-cute text-sm
+                  transition-all border-2 hover:shadow-fufu-hover touch-target
+                  disabled:opacity-60 disabled:cursor-not-allowed
+                  ${isMine ? 'border-fufu-pink bg-fufu-pink-soft/40' : 'border-transparent ' + opt.bg}
+                  text-fufu-text`}
+                title={isMine ? '再点一次可撤销' : `投「${opt.label}」一票`}
               >
                 <span className="text-lg">{opt.icon}</span>
                 <span>{opt.label}</span>
+                {isMine && <span className="text-xs text-fufu-pink">✓</span>}
               </button>
-            ))}
-          </div>
-        ) : (
-          <div className="space-y-2.5">
+            );
+          })}
+        </div>
+
+        {/* 结果条：有人投票时展示 */}
+        {total > 0 && (
+          <div className="space-y-2.5 pt-1">
             {options.map((opt) => {
-              const pct = Math.round((counts[opt.key] / total) * 100);
+              const pct = Math.round((counts[opt.key] / displayTotal) * 100);
               return (
                 <div key={opt.key} className="space-y-1">
                   <div className="flex items-center justify-between text-sm font-body">
@@ -171,10 +218,12 @@ function ArticlePoll({ articleId }: { articleId: number }) {
                 </div>
               );
             })}
-            <p className="text-xs text-fufu-text-muted text-center mt-2">
-              已有 {total} 人参与
-            </p>
+            <p className="text-xs text-fufu-text-muted text-center mt-2">已有 {total} 人参与</p>
           </div>
+        )}
+
+        {loaded && total === 0 && (
+          <p className="text-xs text-fufu-text-muted">还没有人投票，你来当第一个吧～</p>
         )}
       </div>
     </DeepSection>
@@ -199,16 +248,21 @@ function getReasonBadge(reason: string): { icon: string; color: string; bg: stri
 }
 
 // ===== Related articles =====
-function RelatedArticles({ articleId, sourceId, tags }: { articleId: number; sourceId: number; tags: string[] }) {
+function RelatedArticles({
+  articleId,
+  sourceId,
+  tags,
+}: {
+  articleId: number;
+  sourceId: number;
+  tags: string[];
+}) {
   const navigate = useNavigate();
 
   const { data, isLoading } = useQuery({
     queryKey: ['recommendations', 'related', articleId],
     queryFn: async () => {
-      const { data } = await client.get(`/recommendations/similar/${articleId}`, {
-        params: { limit: 5 },
-      });
-      return data;
+      return fetchSimilarArticles(articleId, 5);
     },
     enabled: !!articleId,
     staleTime: 5 * 60 * 1000,
@@ -216,9 +270,8 @@ function RelatedArticles({ articleId, sourceId, tags }: { articleId: number; sou
   });
 
   const articles = useMemo(() => {
-    const inner = data?.data || data;
-    const items = inner?.items || [];
-    return items.filter((a: any) => a.article_id !== articleId).slice(0, 5);
+    const items = data?.items ?? [];
+    return items.filter((a) => a.article_id !== articleId).slice(0, 5);
   }, [data, articleId]);
 
   // Show loading skeleton
@@ -242,16 +295,14 @@ function RelatedArticles({ articleId, sourceId, tags }: { articleId: number; sou
 
   return (
     <DeepSection icon="📚" title="相关推荐" delay={0.3}>
-      <p className="font-body text-xs text-fufu-text-muted mb-3">
-        基于标签相似度和热度为你推荐
-      </p>
+      <p className="font-body text-xs text-fufu-text-muted mb-3">基于标签相似度和热度为你推荐</p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {articles.map((a: any) => {
           const reasonMeta = getReasonBadge(a.reason || '相关内容');
           return (
             <button
               key={a.article_id}
-              onClick={() => navigate(`/article/${a.article_id}`)}
+              onClick={() => navigate(`/articles/${a.article_id}`)}
               className="text-left p-3 rounded-fufu bg-fufu-cream/60 hover:bg-fufu-highlight/40 transition-colors group flex flex-col"
             >
               <p className="font-body text-sm text-fufu-text leading-snug line-clamp-2 group-hover:text-fufu-teal-deep transition-colors flex-1">
@@ -265,7 +316,9 @@ function RelatedArticles({ articleId, sourceId, tags }: { articleId: number; sou
               </div>
               {/* Recommendation reason badge */}
               {a.reason && (
-                <span className={`inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded-full font-cute text-[10px] ${reasonMeta.bg} ${reasonMeta.color}`}>
+                <span
+                  className={`inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded-full font-cute text-[10px] ${reasonMeta.bg} ${reasonMeta.color}`}
+                >
                   <span>{reasonMeta.icon}</span>
                   {a.reason}
                 </span>
@@ -294,8 +347,17 @@ export default function ArticlePage() {
   const recordRead = useRecordRead();
   const companion = useCompanionStore();
   const checkAchievement = useCheckAchievement();
-  const [heartBurst, setHeartBurst] = useState<{ active: boolean; x: number; y: number }>({ active: false, x: 0, y: 0 });
+  const [heartBurst, setHeartBurst] = useState<{ active: boolean; x: number; y: number }>({
+    active: false,
+    x: 0,
+    y: 0,
+  });
   const [bgExpanded, setBgExpanded] = useState(false);
+
+  // XSS 防护：正文来自第三方 RSS 源，属完全不可信输入。
+  // 原先直接 dangerouslySetInnerHTML 渲染，恶意订阅源可注入脚本（存储型 XSS）。
+  // 这里用白名单策略清洗后再渲染。
+  const safeContent = useMemo(() => sanitizeHtml(article?.content ?? ''), [article?.content]);
 
   // 文件夹选择器状态
   const { data: folders = [] } = useFolders();
@@ -315,7 +377,10 @@ export default function ArticlePage() {
   }, []);
 
   const deepSummary = article?.deep_summary;
-  const hasDeep = deepSummary && !deepSummary._parse_error && (deepSummary.one_liner || (deepSummary.core_points && deepSummary.core_points.length > 0));
+  const hasDeep =
+    deepSummary &&
+    !deepSummary._parse_error &&
+    (deepSummary.one_liner || (deepSummary.core_points && deepSummary.core_points.length > 0));
 
   const handleFavorite = (e: MouseEvent) => {
     if (!article) return;
@@ -328,7 +393,10 @@ export default function ArticlePage() {
       setShowFolderPicker(true);
     }
     toggleFav.mutate({ id: article.id, value: !article.is_favorite });
-    if (!article.is_favorite) { checkAchievement.mutate({ key: 'fav_10' }); checkAchievement.mutate({ key: 'fav_50' }); }
+    if (!article.is_favorite) {
+      checkAchievement.mutate({ key: 'fav_10' });
+      checkAchievement.mutate({ key: 'fav_50' });
+    }
   };
 
   const handleAddToFolder = (folderId: number) => {
@@ -341,7 +409,7 @@ export default function ArticlePage() {
           companion.setMood('happy');
           companion.showMessage('已添加到文件夹啦～📁');
         },
-      }
+      },
     );
   };
 
@@ -398,6 +466,9 @@ export default function ArticlePage() {
 
   // ===== 阅读进度条 =====
   const [readProgress, setReadProgress] = useState(0);
+  const updateReadProgress = useUpdateReadProgress();
+  // 已上报过的进度档位（每 25% 上报一次），避免滚动时疯狂 PATCH
+  const reportedProgressRef = useRef<number>(0);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -409,13 +480,28 @@ export default function ArticlePage() {
       }
       const progress = Math.min(100, Math.round((scrollTop / docHeight) * 100));
       setReadProgress(progress);
+
+      // 落库：后端 read_progress 字段一直存在且 PATCH 支持，
+      // 但前端从没调用过，刷新后进度永远归零。这里按 25% 档位防抖上报。
+      if (articleId && Number.isFinite(articleId)) {
+        const milestone = Math.floor(progress / 25) * 25;
+        if (milestone > reportedProgressRef.current) {
+          reportedProgressRef.current = milestone;
+          updateReadProgress.mutate({ id: articleId, progress: progress / 100 });
+        }
+      }
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll(); // initial
 
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [articleId, updateReadProgress]);
+
+  // 切换文章时重置上报档位
+  useEffect(() => {
+    reportedProgressRef.current = 0;
+  }, [articleId]);
 
   // ===== Loading skeleton =====
   if (isLoading) {
@@ -424,7 +510,9 @@ export default function ArticlePage() {
         <div className="skeleton h-8 w-2/3 rounded mb-4" />
         <div className="skeleton h-4 w-32 rounded mb-8" />
         <div className="space-y-3">
-          {Array.from({ length: 12 }).map((_, i) => (<div key={i} className="skeleton h-4 w-full rounded" />))}
+          {Array.from({ length: 12 }).map((_, i) => (
+            <div key={i} className="skeleton h-4 w-full rounded" />
+          ))}
         </div>
       </div>
     );
@@ -436,7 +524,9 @@ export default function ArticlePage() {
       <div className="text-center py-20">
         <p className="text-6xl mb-4 animate-float">🔍</p>
         <p className="font-cute text-xl text-fufu-text">找不到这篇文章呢...</p>
-        <button className="fufu-btn-primary mt-4" onClick={() => navigate('/articles')}>回到首页</button>
+        <button className="fufu-btn-primary mt-4" onClick={() => navigate('/articles')}>
+          回到首页
+        </button>
       </div>
     );
   }
@@ -446,10 +536,7 @@ export default function ArticlePage() {
       <HeartBurst active={heartBurst.active} x={heartBurst.x} y={heartBurst.y} count={14} />
 
       {/* ===== 阅读进度条 ===== */}
-      <div
-        className="reading-progress-bar"
-        style={{ width: `${readProgress}%` }}
-      />
+      <div className="reading-progress-bar" style={{ width: `${readProgress}%` }} />
 
       {/* ===== 1. Back button ===== */}
       <button
@@ -520,7 +607,9 @@ export default function ArticlePage() {
                 transition={{ duration: 0.15 }}
                 className="absolute top-full left-0 mt-1 bg-white rounded-fufu-modal shadow-fufu-float border border-fufu-highlight/30 p-1.5 min-w-[180px] z-30"
               >
-                <p className="px-3 py-1.5 text-xs text-fufu-text-muted font-body">📁 添加到文件夹</p>
+                <p className="px-3 py-1.5 text-xs text-fufu-text-muted font-body">
+                  📁 添加到文件夹
+                </p>
                 {folders.map((f) => (
                   <button
                     key={f.id}
@@ -595,124 +684,132 @@ export default function ArticlePage() {
         </div>
       </motion.div>
 
-      {/* 移动端：粘性底部操作栏 */}
-      <div className="md:hidden mobile-sticky-actions px-3 py-2">
-        <div className="flex items-center justify-between gap-1 max-w-3xl mx-auto">
-          <div className="relative" ref={folderPickerRef}>
+      {/* 移动端：粘性底部操作栏。
+          必须 portal 到 body：framer-motion 会在 motion 祖先上临时写入
+          will-change: transform，而 will-change 会像 transform 一样劫持
+          后代 fixed 元素的包含块 —— 操作栏会被钉进文档流深处而不是视口
+          底部（实测 top≈3176px，视口高 844px，等于完全不可见）。 */}
+      {createPortal(
+        <div className="md:hidden mobile-sticky-actions px-3 py-2">
+          <div className="flex items-center justify-between gap-1 max-w-3xl mx-auto">
+            <div className="relative" ref={folderPickerRef}>
+              <button
+                onClick={handleFavorite}
+                className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-fufu font-cute text-[11px] transition-all touch-target ${
+                  article.is_favorite ? 'text-fufu-pink' : 'text-fufu-text-muted'
+                }`}
+              >
+                <Star size={20} weight={article.is_favorite ? 'fill' : 'regular'} />
+                {article.is_favorite ? '已收藏' : '收藏'}
+              </button>
+
+              {/* 文件夹选择器（移动端） */}
+              <AnimatePresence>
+                {showFolderPicker && article.is_favorite && folders.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -4, scale: 0.95 }}
+                    animate={{ opacity: 1, y: -4, scale: 1 }}
+                    exit={{ opacity: 0, y: -4, scale: 0.95 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute bottom-full left-0 mb-1 bg-white rounded-fufu-modal shadow-fufu-float border border-fufu-highlight/30 p-1.5 min-w-[180px] z-30"
+                  >
+                    <p className="px-3 py-1.5 text-xs text-fufu-text-muted font-body">
+                      📁 添加到文件夹
+                    </p>
+                    {folders.map((f) => (
+                      <button
+                        key={f.id}
+                        onClick={() => handleAddToFolder(f.id)}
+                        disabled={addToFolder.isPending}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-fufu text-sm font-body text-fufu-text hover:bg-fufu-cream transition-colors text-left disabled:opacity-40"
+                      >
+                        <span>{f.icon}</span>
+                        <span>{f.name}</span>
+                        <span className="text-fufu-text-muted text-xs ml-auto">
+                          {f.article_count}
+                        </span>
+                      </button>
+                    ))}
+                    <div className="my-1 border-t border-fufu-highlight/20" />
+                    <button
+                      onClick={() => setShowFolderPicker(false)}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-fufu text-sm font-body text-fufu-text-muted hover:bg-fufu-cream transition-colors"
+                    >
+                      暂不分类
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
             <button
-              onClick={handleFavorite}
+              onClick={() => toggleLater.mutate({ id: article.id, value: !article.is_later })}
               className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-fufu font-cute text-[11px] transition-all touch-target ${
-                article.is_favorite
-                  ? 'text-fufu-pink'
-                  : 'text-fufu-text-muted'
+                article.is_later ? 'text-fufu-mint' : 'text-fufu-text-muted'
               }`}
             >
-              <Star size={20} weight={article.is_favorite ? 'fill' : 'regular'} />
-              {article.is_favorite ? '已收藏' : '收藏'}
+              <BookmarkSimple size={20} weight={article.is_later ? 'fill' : 'regular'} />
+              {article.is_later ? '待阅读' : '稍后读'}
             </button>
 
-            {/* 文件夹选择器（移动端） */}
-            <AnimatePresence>
-              {showFolderPicker && article.is_favorite && folders.length > 0 && (
-                <motion.div
-                  initial={{ opacity: 0, y: -4, scale: 0.95 }}
-                  animate={{ opacity: 1, y: -4, scale: 1 }}
-                  exit={{ opacity: 0, y: -4, scale: 0.95 }}
-                  transition={{ duration: 0.15 }}
-                  className="absolute bottom-full left-0 mb-1 bg-white rounded-fufu-modal shadow-fufu-float border border-fufu-highlight/30 p-1.5 min-w-[180px] z-30"
-                >
-                  <p className="px-3 py-1.5 text-xs text-fufu-text-muted font-body">📁 添加到文件夹</p>
-                  {folders.map((f) => (
-                    <button
-                      key={f.id}
-                      onClick={() => handleAddToFolder(f.id)}
-                      disabled={addToFolder.isPending}
-                      className="w-full flex items-center gap-2 px-3 py-2 rounded-fufu text-sm font-body text-fufu-text hover:bg-fufu-cream transition-colors text-left disabled:opacity-40"
-                    >
-                      <span>{f.icon}</span>
-                      <span>{f.name}</span>
-                      <span className="text-fufu-text-muted text-xs ml-auto">{f.article_count}</span>
-                    </button>
-                  ))}
-                  <div className="my-1 border-t border-fufu-highlight/20" />
-                  <button
-                    onClick={() => setShowFolderPicker(false)}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-fufu text-sm font-body text-fufu-text-muted hover:bg-fufu-cream transition-colors"
-                  >
-                    暂不分类
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+            {/* TTS on mobile */}
+            {article.content && (
+              <div className="flex flex-col items-center gap-0.5">
+                <TTSReader content={article.content} title={article.title} />
+              </div>
+            )}
 
-          <button
-            onClick={() => toggleLater.mutate({ id: article.id, value: !article.is_later })}
-            className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-fufu font-cute text-[11px] transition-all touch-target ${
-              article.is_later
-                ? 'text-fufu-mint'
-                : 'text-fufu-text-muted'
-            }`}
-          >
-            <BookmarkSimple size={20} weight={article.is_later ? 'fill' : 'regular'} />
-            {article.is_later ? '待阅读' : '稍后读'}
-          </button>
-
-          {/* TTS on mobile */}
-          {article.content && (
+            {/* Share on mobile */}
             <div className="flex flex-col items-center gap-0.5">
-              <TTSReader content={article.content} title={article.title} />
+              <ShareButton
+                title={article.title}
+                url={window.location.href}
+                description={article.summary || ''}
+                imageUrl={article.image_url || ''}
+              />
             </div>
-          )}
 
-          {/* Share on mobile */}
-          <div className="flex flex-col items-center gap-0.5">
-            <ShareButton
-              title={article.title}
-              url={window.location.href}
-              description={article.summary || ''}
-              imageUrl={article.image_url || ''}
-            />
+            <button
+              onClick={() => aiSummarize.mutate(article.id)}
+              disabled={aiSummarize.isPending}
+              className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-fufu font-cute text-[11px] text-fufu-text-muted transition-all touch-target"
+              title="AI 摘要"
+            >
+              <Sparkle size={20} className={aiSummarize.isPending ? 'animate-spin' : ''} />
+              AI摘要
+            </button>
           </div>
-
-          <button
-            onClick={() => aiSummarize.mutate(article.id)}
-            disabled={aiSummarize.isPending}
-            className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-fufu font-cute text-[11px] text-fufu-text-muted transition-all touch-target"
-            title="AI 摘要"
-          >
-            <Sparkle size={20} className={aiSummarize.isPending ? 'animate-spin' : ''} />
-            AI摘要
-          </button>
-        </div>
-      </div>
+        </div>,
+        document.body,
+      )}
 
       {/* ===== 4. Existing quick summary ===== */}
-      {article.summary && (() => {
-        const cleanSummary = article.summary
-          .replace(/<[^>]+>/g, '')
-          .replace(/&[^;]+;/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim();
-        return cleanSummary ? (
-          <motion.div
-            variants={fadeInUp}
-            initial="hidden"
-            animate="visible"
-            transition={{ delay: 0.15 }}
-            className={`mb-5 p-4 rounded-fufu-card border border-dashed ${
-              hasDeep
-                ? 'bg-fufu-highlight/20 border-fufu-teal/15'
-                : 'bg-fufu-highlight/40 border-fufu-pink/20'
-            }`}
-          >
-            <p className="font-cute text-xs text-fufu-text-light mb-1">
-              {hasDeep ? '💡 快速摘要' : '💡 fufu帮你读'}
-            </p>
-            <p className="font-body text-sm text-fufu-text leading-relaxed">{cleanSummary}</p>
-          </motion.div>
-        ) : null;
-      })()}
+      {article.summary &&
+        (() => {
+          const cleanSummary = article.summary
+            .replace(/<[^>]+>/g, '')
+            .replace(/&[^;]+;/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+          return cleanSummary ? (
+            <motion.div
+              variants={fadeInUp}
+              initial="hidden"
+              animate="visible"
+              transition={{ delay: 0.15 }}
+              className={`mb-5 p-4 rounded-fufu-card border border-dashed ${
+                hasDeep
+                  ? 'bg-fufu-highlight/20 border-fufu-teal/15'
+                  : 'bg-fufu-highlight/40 border-fufu-pink/20'
+              }`}
+            >
+              <p className="font-cute text-xs text-fufu-text-light mb-1">
+                {hasDeep ? '💡 快速摘要' : '💡 fufu帮你读'}
+              </p>
+              <p className="font-body text-sm text-fufu-text leading-relaxed">{cleanSummary}</p>
+            </motion.div>
+          ) : null;
+        })()}
 
       {/* ===== 5. Deep Summary sections ===== */}
       {deepSummary && hasDeep ? (
@@ -802,36 +899,39 @@ export default function ArticlePage() {
           )}
 
           {/* 5e. Reactions */}
-          {deepSummary.reactions && (deepSummary.reactions.support || deepSummary.reactions.oppose || deepSummary.reactions.neutral) && (
-            <DeepSection icon="🗣️" title="各方反应" delay={0.2}>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {deepSummary.reactions.support && (
-                  <div className="bg-fufu-soft-green/20 border border-fufu-mint/20 rounded-fufu p-4">
-                    <p className="font-cute text-sm text-fufu-mint mb-1">👍 支持方</p>
-                    <p className="font-body text-xs text-fufu-text leading-relaxed">
-                      {deepSummary.reactions.support}
-                    </p>
-                  </div>
-                )}
-                {deepSummary.reactions.oppose && (
-                  <div className="bg-fufu-error-light/20 border border-fufu-error/20 rounded-fufu p-4">
-                    <p className="font-cute text-sm text-fufu-error mb-1">👎 反对方</p>
-                    <p className="font-body text-xs text-fufu-text leading-relaxed">
-                      {deepSummary.reactions.oppose}
-                    </p>
-                  </div>
-                )}
-                {deepSummary.reactions.neutral && (
-                  <div className="bg-fufu-soft-purple/20 border border-fufu-lavender/20 rounded-fufu p-4">
-                    <p className="font-cute text-sm text-fufu-lavender mb-1">🤔 中立方</p>
-                    <p className="font-body text-xs text-fufu-text leading-relaxed">
-                      {deepSummary.reactions.neutral}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </DeepSection>
-          )}
+          {deepSummary.reactions &&
+            (deepSummary.reactions.support ||
+              deepSummary.reactions.oppose ||
+              deepSummary.reactions.neutral) && (
+              <DeepSection icon="🗣️" title="各方反应" delay={0.2}>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {deepSummary.reactions.support && (
+                    <div className="bg-fufu-soft-green/20 border border-fufu-mint/20 rounded-fufu p-4">
+                      <p className="font-cute text-sm text-fufu-mint mb-1">👍 支持方</p>
+                      <p className="font-body text-xs text-fufu-text leading-relaxed">
+                        {deepSummary.reactions.support}
+                      </p>
+                    </div>
+                  )}
+                  {deepSummary.reactions.oppose && (
+                    <div className="bg-fufu-error-light/20 border border-fufu-error/20 rounded-fufu p-4">
+                      <p className="font-cute text-sm text-fufu-error mb-1">👎 反对方</p>
+                      <p className="font-body text-xs text-fufu-text leading-relaxed">
+                        {deepSummary.reactions.oppose}
+                      </p>
+                    </div>
+                  )}
+                  {deepSummary.reactions.neutral && (
+                    <div className="bg-fufu-soft-purple/20 border border-fufu-lavender/20 rounded-fufu p-4">
+                      <p className="font-cute text-sm text-fufu-lavender mb-1">🤔 中立方</p>
+                      <p className="font-body text-xs text-fufu-text leading-relaxed">
+                        {deepSummary.reactions.neutral}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </DeepSection>
+            )}
         </motion.div>
       ) : (
         /* ===== Generate Deep Summary button (when no deep_summary) ===== */
@@ -844,8 +944,14 @@ export default function ArticlePage() {
             className="bg-white/70 backdrop-blur-sm rounded-fufu-card border-2 border-dashed border-fufu-teal/20 p-6 text-center shadow-fufu"
           >
             <div className="flex justify-center mb-3">
-              <div className={`w-14 h-14 rounded-full bg-fufu-teal/10 flex items-center justify-center ${generateDeep.isPending ? 'animate-pulse-soft' : ''}`}>
-                <Robot size={28} className={`text-fufu-teal ${generateDeep.isPending ? 'animate-float' : ''}`} weight="duotone" />
+              <div
+                className={`w-14 h-14 rounded-full bg-fufu-teal/10 flex items-center justify-center ${generateDeep.isPending ? 'animate-pulse-soft' : ''}`}
+              >
+                <Robot
+                  size={28}
+                  className={`text-fufu-teal ${generateDeep.isPending ? 'animate-float' : ''}`}
+                  weight="duotone"
+                />
               </div>
             </div>
             <h3 className="font-cute text-fufu-text mb-1.5">🤖 AI 深度解读</h3>
@@ -910,7 +1016,7 @@ export default function ArticlePage() {
             [&_p]:mb-4 [&_img]:rounded-fufu-img [&_img]:max-w-full [&_a]:text-fufu-pink
             [&_h1]:font-cute [&_h2]:font-cute [&_h3]:font-cute
             [&_blockquote]:border-l-4 [&_blockquote]:border-fufu-pink [&_blockquote]:pl-4 [&_blockquote]:text-fufu-text-light"
-          dangerouslySetInnerHTML={{ __html: article.content }}
+          dangerouslySetInnerHTML={{ __html: safeContent }}
         />
       ) : (
         <motion.div
@@ -956,10 +1062,10 @@ export default function ArticlePage() {
         tags={article.tags || []}
       />
 
-      {/* ===== 11. Hot comments preview ===== */}
-      <CommentSection articleId={article.id} previewOnly />
-
-      {/* ===== 12. Full comment section ===== */}
+      {/* ===== 11. 评论区 =====
+          修复：原先这里渲染了两次 CommentSection（一次 previewOnly、一次完整版），
+          两者 queryKey 完全相同，会并发发两份相同的请求并渲染两套评论区。
+          现在只保留一个完整评论区。 */}
       <CommentSection articleId={article.id} />
     </div>
   );

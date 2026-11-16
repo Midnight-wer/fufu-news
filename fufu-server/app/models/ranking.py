@@ -6,11 +6,11 @@ fufu新闻 - 排名/热门榜单数据模型
 ArticleStats: 每篇文章一条记录，存储浏览数、评论数、收藏数和计算出的热度分。
 ViewLog: 记录每次浏览的 IP 和文章 ID，用于去重和排重统计。
 """
-from sqlalchemy import (
-    String, Integer, DateTime, Float, ForeignKey, Index
-)
-from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime, timezone
+
+from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column
+
 from app.core.database import Base
 
 

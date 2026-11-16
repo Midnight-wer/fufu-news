@@ -9,11 +9,13 @@ fufu新闻 - 多源聚合对比服务
 2. 标题关键词匹配：使用 jieba 分词 + Jaccard 相似度
 3. 评分排序：标签重叠数 + 标题关键词匹配数 + 时效性加分
 """
-import re
 import logging
-from datetime import datetime, timezone, timedelta
-from sqlalchemy.ext.asyncio import AsyncSession
+import re
+from datetime import datetime, timedelta, timezone
+
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models.article import Article
 from app.models.source import Source
 
@@ -30,8 +32,8 @@ _STOP_WORDS: set[str] = {
     "从", "与", "及", "或", "等", "为", "其", "以", "之", "中",
     "后", "前", "内", "外", "间", "时", "但", "并", "而", "则",
     "又", "将", "能", "可", "已", "还", "做", "出", "想", "最",
-    "更", "只", "再", "才", "过", "用", "去", "年", "月", "日",
-    "新", "大", "小", "多", "少", "高", "长", "好", "真", "向",
+    "更", "只", "再", "才", "过", "用", "年", "月", "日",
+    "新", "大", "小", "多", "少", "高", "长", "真", "向",
     "各", "位", "吗", "吧", "呢", "啊", "哦", "哈", "呀", "嘛",
     "唉", "嗯", "喂", "哎", "嘿", "哟", "哇", "嘻", "哼", "啦",
     "哎哟", "哎呀", "哈哈", "呵呵", "嘿嘿", "哦哦", "呜呜",

@@ -14,17 +14,20 @@ fufu新闻 - AI 接口
 fufu 人设：可爱元气的小狐狸 AI 助手，语气甜美俏皮。
 """
 import logging
+
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from app.core.database import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.deps import get_current_user
 from app.core.config import settings
+from app.core.database import get_db
+from app.core.url_policy import host_allowed_for_ai
 from app.models.article import Article
 from app.models.user import User
-from app.api.deps import get_current_user
-from app.services.ai import generate_summary, generate_tags, process_article, generate_deep_summary
+from app.services.ai import generate_deep_summary, generate_summary, generate_tags, process_article
 
 # AI 模块日志记录器
 logger = logging.getLogger("fufu.ai")
@@ -78,21 +81,69 @@ def _resolve(config: AiConfig) -> tuple[str, str, str]:
     解析 AI 配置，返回 (base_url, model, api_key)。
     URL 不追加任何后缀（已经是完整的 API 端点地址）。
 
+    安全约束（修复 P0：API Key 外泄 + SSRF）：
+    1. 自定义 base_url 必须通过 SSRF 检查（禁内网/元数据/非 http(s)）
+       **且** 主机名在 settings.ai_allowed_hosts 白名单内；
+    2. 一旦使用了自定义 base_url，**绝不回退到服务端 Key**——
+       未显式提供 ai_api_key 时直接 400。
+       否则攻击者把自己的地址填进来、不填 key，就能拿到服务端真实
+       DeepSeek Key（原实现 `key = req.api_key or settings.ai_api_key` 正是此漏洞）。
+
     参数:
         config: 前端传入的 AiConfig（可为空）
 
     返回:
         tuple[str, str, str]: (API 地址, 模型名称, API 密钥)
+
+    异常:
+        HTTPException(400): 自定义地址不合法 / 不在白名单 / 缺少密钥
     """
-    url = (config.ai_base_url or settings.ai_base_url).rstrip("/")
+    custom_url = (config.ai_base_url or "").strip()
     model = config.ai_model or settings.ai_model
-    key = config.ai_api_key or settings.ai_api_key
-    return url, model, key
+    default_url = settings.ai_base_url.rstrip("/")
+
+    if not custom_url:
+        # 走服务端默认配置：允许使用服务端密钥
+        return default_url, model, settings.ai_api_key
+
+    url = custom_url.rstrip("/")
+
+    # 前端总是会带上 base_url（即使与服务端默认相同）。
+    # 只要主机与服务端配置的主机一致，就视为「默认配置」，允许用服务端密钥，
+    # 否则会把正常的 DeepSeek 用法全部误判成自定义地址而要求前端填 Key。
+    if _host_of(url) == _host_of(default_url):
+        return url or default_url, model, settings.ai_api_key
+
+    ok, reason = host_allowed_for_ai(url, settings.ai_allowed_hosts_list)
+    if not ok:
+        logger.warning(f"AI 自定义地址被拒绝: {url!r} — {reason}")
+        raise HTTPException(status_code=400, detail=reason)
+
+    if not config.ai_api_key:
+        raise HTTPException(
+            status_code=400,
+            detail="使用自定义 AI 地址时必须同时提供 API Key（不会使用服务端密钥）",
+        )
+
+    return url, model, config.ai_api_key
+
+
+def _host_of(url: str) -> str:
+    """取 URL 的主机名（小写），解析失败返回空串。仅用于同主机判定。"""
+    from urllib.parse import urlparse
+
+    try:
+        return (urlparse(url).hostname or "").lower()
+    except Exception:
+        return ""
 
 
 def _auth_headers(api_key: str | None) -> dict:
     """
     构建 AI API 的请求头——包含 Content-Type 和可选的 Bearer 认证。
+
+    注意：此处**不再**回退到 settings.ai_api_key（密钥回退已在 _resolve 中
+    统一处理），避免出现「地址是攻击者的、密钥是服务端的」这种外泄组合。
 
     参数:
         api_key: API 密钥（可为 None）
@@ -101,19 +152,40 @@ def _auth_headers(api_key: str | None) -> dict:
         dict: HTTP 请求头字典
     """
     h = {"Content-Type": "application/json"}
-    key = api_key or settings.ai_api_key
-    if key:
-        h["Authorization"] = f"Bearer {key}"
+    if api_key:
+        h["Authorization"] = f"Bearer {api_key}"
     return h
 
 
+def _safe_log_headers(headers: dict) -> dict:
+    """
+    日志脱敏：把 Authorization 等敏感头替换成掩码后再打印。
+
+    修复 P0：原实现直接 `logger.debug(f"请求头: {headers}")`，
+    DEBUG 开启时会把 `Bearer sk-xxx` 写进 logs/fufu.log。
+    """
+    safe = {}
+    for k, v in (headers or {}).items():
+        if k.lower() in ("authorization", "api-key", "x-api-key"):
+            safe[k] = f"{str(v)[:7]}***" if v else "(空)"
+        else:
+            safe[k] = v
+    return safe
+
+
 @router.post("/health")
-async def ai_health(config: AiConfig = AiConfig()):
+async def ai_health(
+    config: AiConfig = AiConfig(),
+    _user: User = Depends(get_current_user),
+):
     """
     AI 服务健康检查——POST /api/v1/ai/health
 
     向配置的 AI API 发送一个最小请求（"hi"），
     检测连接是否正常、模型是否可用。
+
+    安全：此端点会向外网发起请求，原先无认证，任何人都能把它当内网探针
+    或用它刷 AI 额度。现已要求登录。
 
     参数:
         config: 可选，覆盖默认 AI 配置
@@ -130,7 +202,8 @@ async def ai_health(config: AiConfig = AiConfig()):
     }
 
     logger.info(f"健康检查 -> URL: {base_url}, Model: {model}")
-    logger.debug(f"健康检查 请求头: {headers}")
+    # 日志脱敏：不打印含 Bearer 密钥的原始请求头
+    logger.debug(f"健康检查 请求头: {_safe_log_headers(headers)}")
     logger.debug(f"健康检查 请求体: {payload}")
 
     try:
@@ -174,8 +247,23 @@ class ChatRequest(BaseModel):
     api_key: str | None = None
 
 
+def _resolve_chat(req: "ChatRequest") -> tuple[str, str, str]:
+    """
+    对话类端点的配置解析，复用 AiConfig 的安全策略。
+
+    与 _resolve 完全同规则（白名单 + 自定义地址必须自带 Key），
+    只是入参字段名不同（base_url/api_key vs ai_base_url/ai_api_key）。
+    """
+    return _resolve(
+        AiConfig(ai_model=req.model, ai_base_url=req.base_url, ai_api_key=req.api_key)
+    )
+
+
 @router.post("/chat")
-async def ai_chat(req: ChatRequest):
+async def ai_chat(
+    req: ChatRequest,
+    _user: User = Depends(get_current_user),
+):
     """
     通用 AI 对话接口——POST /api/v1/ai/chat
 
@@ -184,6 +272,10 @@ async def ai_chat(req: ChatRequest):
 
     fufu 人设会自动注入为 system 角色的第一条消息。
 
+    安全：此端点原先无认证，任何人都能匿名消耗 AI 额度；
+    且 base_url 完全可控 + 密钥回退服务端 Key，构成 Key 外泄与 SSRF。
+    现已要求登录，并对自定义地址施加白名单与「必须自带 Key」约束。
+
     参数:
         req: ChatRequest（对话消息 + 可选 AI 配置覆盖）
 
@@ -191,19 +283,24 @@ async def ai_chat(req: ChatRequest):
         dict: {"content": "AI 回复文本"}
 
     异常:
+        HTTPException(400): 自定义地址不合法或缺少密钥
         HTTPException(502): 连接失败
         HTTPException(504): 超时
     """
-    base_url = (req.base_url or settings.ai_base_url).rstrip("/")
-    model = req.model or settings.ai_model
-    key = req.api_key or settings.ai_api_key
+    if not req.messages:
+        raise HTTPException(status_code=400, detail="对话内容不能为空哦～")
 
+    base_url, model, key = _resolve_chat(req)
     headers = _auth_headers(key)
 
     # 构建消息列表：system prompt + 最近 20 条历史消息
     msgs = [{"role": "system", "content": FUFU_SYSTEM_PROMPT}]
     for m in req.messages[-20:]:  # 只保留最近 20 条，避免超出上下文窗口
-        msgs.append({"role": m.get("role", "user"), "content": m.get("content", "")})
+        role = m.get("role", "user")
+        if role not in ("user", "assistant"):
+            role = "user"
+        content = str(m.get("content", ""))[:8000]  # 单条长度上限，防止打爆 token
+        msgs.append({"role": role, "content": content})
 
     payload = {
         "model": model,
@@ -213,7 +310,8 @@ async def ai_chat(req: ChatRequest):
     }
 
     logger.info(f"Chat -> URL: {base_url}, Model: {model}")
-    logger.debug(f"Chat 请求头: {headers}")
+    # 日志脱敏：不打印含 Bearer 密钥的原始请求头
+    logger.debug(f"Chat 请求头: {_safe_log_headers(headers)}")
     logger.debug(f"Chat 消息数: {len(msgs)}")
 
     try:
@@ -224,13 +322,18 @@ async def ai_chat(req: ChatRequest):
                 logger.error(f"Chat 错误响应: {resp.text[:500]}")
             resp.raise_for_status()
             data = resp.json()
-            msg = data["choices"][0]["message"]
+            # 上游可能返回空 choices，直接取 [0] 会 IndexError
+            choices = data.get("choices") or []
+            if not choices:
+                logger.error(f"Chat 上游返回空 choices: {str(data)[:300]}")
+                raise HTTPException(status_code=502, detail="AI 没有返回内容，换个问题试试～")
+            msg = choices[0].get("message") or {}
             content = msg.get("content") or msg.get("reasoning_content") or ""
             return {"content": content}
-    except httpx.ConnectError:
-        raise HTTPException(status_code=502, detail=f"无法连接到 {base_url}，请确认地址正确～")
-    except httpx.TimeoutException:
-        raise HTTPException(status_code=504, detail="AI 服务响应超时，请稍后重试～")
+    except httpx.ConnectError as e:
+        raise HTTPException(status_code=502, detail=f"无法连接到 {base_url}，请确认地址正确～") from e
+    except httpx.TimeoutException as e:
+        raise HTTPException(status_code=504, detail="AI 服务响应超时，请稍后重试～") from e
     except httpx.HTTPStatusError as e:
         detail = f"HTTP {e.response.status_code}"
         try:
@@ -239,9 +342,11 @@ async def ai_chat(req: ChatRequest):
                 detail += f": {body['error']}"
         except Exception:
             detail += f": {e.response.text[:200]}"
-        raise HTTPException(status_code=502, detail=detail)
+        raise HTTPException(status_code=502, detail=detail) from e
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"AI 调用失败: {str(e)[:200]}")
+        raise HTTPException(status_code=502, detail=f"AI 调用失败: {str(e)[:200]}") from e
 
 
 @router.post("/summarize/{article_id}")
@@ -616,11 +721,15 @@ async def process_all_articles(
 
 # ========== 流式对话 ==========
 import json as _json
+
 from fastapi.responses import StreamingResponse
 
 
 @router.post("/chat/stream")
-async def ai_chat_stream(req: ChatRequest):
+async def ai_chat_stream(
+    req: ChatRequest,
+    _user: User = Depends(get_current_user),
+):
     """
     流式 AI 对话——POST /api/v1/ai/chat/stream
 
@@ -633,22 +742,27 @@ async def ai_chat_stream(req: ChatRequest):
     - 提取 delta.content 内容并转发给前端
     - 遇到 [DONE] 标记时结束流
 
+    安全：与 /ai/chat 同样要求登录，并复用同一套地址白名单 + 密钥策略。
+
     参数:
         req: ChatRequest（对话消息 + 可选配置）
 
     返回:
         StreamingResponse: SSE 流（text/event-stream MIME 类型）
     """
-    base_url = (req.base_url or settings.ai_base_url).rstrip("/")
-    model = req.model or settings.ai_model
-    key = req.api_key or settings.ai_api_key
+    if not req.messages:
+        raise HTTPException(status_code=400, detail="对话内容不能为空哦～")
 
+    base_url, model, key = _resolve_chat(req)
     headers = _auth_headers(key)
 
     # 构建消息列表，注入 fufu 人设
     msgs = [{"role": "system", "content": FUFU_SYSTEM_PROMPT}]
     for m in req.messages[-20:]:  # 只保留最近 20 条历史
-        msgs.append({"role": m.get("role", "user"), "content": m.get("content", "")})
+        role = m.get("role", "user")
+        if role not in ("user", "assistant"):
+            role = "user"
+        msgs.append({"role": role, "content": str(m.get("content", ""))[:8000]})
 
     payload = {
         "model": model,

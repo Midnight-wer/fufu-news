@@ -6,20 +6,23 @@ import { useAggregation } from '../../hooks/useAggregation';
 import type { RelatedSourceItem } from '../../api/aggregation';
 
 // ===== 视角徽章配置 =====
-const PERSPECTIVE_CONFIG: Record<string, { color: string; bg: string; border: string; icon: string }> = {
-  '同一事件': {
+const PERSPECTIVE_CONFIG: Record<
+  string,
+  { color: string; bg: string; border: string; icon: string }
+> = {
+  同一事件: {
     color: 'text-fufu-mint',
     bg: 'bg-fufu-soft-green/20',
     border: 'border-fufu-mint/30',
     icon: '🔄',
   },
-  '相关报道': {
+  相关报道: {
     color: 'text-fufu-lavender',
     bg: 'bg-fufu-soft-purple/20',
     border: 'border-fufu-lavender/30',
     icon: '📡',
   },
-  '补充视角': {
+  补充视角: {
     color: 'text-fufu-teal-deep',
     bg: 'bg-fufu-soft-blue/20',
     border: 'border-fufu-teal-deep/30',
@@ -75,12 +78,12 @@ function RelatedCard({
     <motion.div
       variants={cardVariant}
       className={`border rounded-fufu-card p-4 transition-all duration-200 hover:shadow-fufu-hover cursor-pointer group ${cfg.bg} ${cfg.border}`}
-      onClick={() => navigate(`/article/${article.id}`)}
+      onClick={() => navigate(`/articles/${article.id}`)}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
-          navigate(`/article/${article.id}`);
+          navigate(`/articles/${article.id}`);
         }
       }}
     >
@@ -95,8 +98,7 @@ function RelatedCard({
           </span>
         </div>
         <span className="flex-shrink-0 font-body text-xs text-fufu-text-muted ml-2">
-          相似度{' '}
-          <span className="font-cute text-fufu-teal-deep">{pct}%</span>
+          相似度 <span className="font-cute text-fufu-teal-deep">{pct}%</span>
         </span>
       </div>
 
@@ -185,9 +187,7 @@ export default function AggregatedView({ articleId }: { articleId: number }) {
         {/* 标题栏 */}
         <div className="flex items-center gap-2 mb-4">
           <span className="text-xl">📰</span>
-          <h3 className="font-cute text-fufu-text text-base">
-            同一事件，不同视角
-          </h3>
+          <h3 className="font-cute text-fufu-text text-base">同一事件，不同视角</h3>
           <span className="font-body text-xs text-fufu-text-muted">
             ({related_sources.length} 个来源)
           </span>
@@ -202,12 +202,7 @@ export default function AggregatedView({ articleId }: { articleId: number }) {
           className="grid grid-cols-1 gap-3"
         >
           {related_sources.map((item, idx) => (
-            <RelatedCard
-              key={item.article.id}
-              item={item}
-              index={idx}
-              navigate={navigate}
-            />
+            <RelatedCard key={item.article.id} item={item} index={idx} navigate={navigate} />
           ))}
         </motion.div>
 
@@ -219,11 +214,7 @@ export default function AggregatedView({ articleId }: { articleId: number }) {
               className="flex items-center gap-1.5 font-cute text-sm text-fufu-teal-deep hover:text-fufu-teal transition-colors"
             >
               <span>👉 对比查看</span>
-              {showCompare ? (
-                <CaretUp size={16} />
-              ) : (
-                <CaretDown size={16} />
-              )}
+              {showCompare ? <CaretUp size={16} /> : <CaretDown size={16} />}
             </button>
 
             <AnimatePresence>
@@ -239,18 +230,14 @@ export default function AggregatedView({ articleId }: { articleId: number }) {
                     {/* 相同点 */}
                     {common_points.length > 0 && (
                       <div className="bg-fufu-soft-green/10 border border-fufu-mint/15 rounded-fufu p-3">
-                        <p className="font-cute text-xs text-fufu-mint mb-1.5">
-                          ✅ 相同点
-                        </p>
+                        <p className="font-cute text-xs text-fufu-mint mb-1.5">✅ 相同点</p>
                         <ul className="space-y-1">
                           {common_points.map((point, i) => (
                             <li
                               key={i}
                               className="font-body text-xs text-fufu-text leading-relaxed flex items-start gap-1.5"
                             >
-                              <span className="text-fufu-text-muted mt-0.5 flex-shrink-0">
-                                •
-                              </span>
+                              <span className="text-fufu-text-muted mt-0.5 flex-shrink-0">•</span>
                               <span>{point}</span>
                             </li>
                           ))}
@@ -261,18 +248,14 @@ export default function AggregatedView({ articleId }: { articleId: number }) {
                     {/* 不同点 */}
                     {different_points.length > 0 && (
                       <div className="bg-fufu-soft-purple/10 border border-fufu-lavender/15 rounded-fufu p-3">
-                        <p className="font-cute text-xs text-fufu-lavender mb-1.5">
-                          🔀 不同点
-                        </p>
+                        <p className="font-cute text-xs text-fufu-lavender mb-1.5">🔀 不同点</p>
                         <ul className="space-y-1">
                           {different_points.map((point, i) => (
                             <li
                               key={i}
                               className="font-body text-xs text-fufu-text leading-relaxed flex items-start gap-1.5"
                             >
-                              <span className="text-fufu-text-muted mt-0.5 flex-shrink-0">
-                                •
-                              </span>
+                              <span className="text-fufu-text-muted mt-0.5 flex-shrink-0">•</span>
                               <span>{point}</span>
                             </li>
                           ))}

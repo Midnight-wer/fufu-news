@@ -11,17 +11,20 @@ RSS 代理 + 订阅源验证 + 健康监控
 import asyncio
 import logging
 import time
-import httpx
-import feedparser
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends
+
+import feedparser
+import httpx
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from app.core.database import get_db, async_session
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.deps import get_current_user
+from app.core.database import get_db
+from app.core.url_policy import validate_public_url
 from app.models.source import Source
 from app.models.user import User
-from app.api.deps import get_current_user
 
 logger = logging.getLogger("fufu.proxy")
 router = APIRouter(tags=["RSS代理"])
@@ -89,6 +92,24 @@ class OpmlImportRequest(BaseModel):
     xml: str
 
 
+# ====== 地址安全校验（SSRF 防护） ======
+
+def _guard_url(raw_url: str) -> None:
+    """
+    校验用户提供的待抓取地址，拦截内网 / 云元数据 / 非 http(s) 协议。
+
+    修复 P0：/proxy 原本把任意 URL 的响应体**原文回显**给前端，
+    认证用户即可读取内网任意 HTTP 资源（Redis、ES、管理后台、169.254.169.254）；
+    /validate 用状态码差异还能当端口扫描器用。
+
+    公网 RSS 地址不受影响，添加订阅源的既有流程完全保留。
+    """
+    ok, reason = validate_public_url(raw_url)
+    if not ok:
+        logger.warning(f"订阅源地址被拒绝: {str(raw_url)[:120]!r} — {reason}")
+        raise HTTPException(status_code=400, detail=reason)
+
+
 # ====== RSS 代理 ======
 
 @router.post("/proxy")
@@ -98,6 +119,7 @@ async def proxy_feed(
 ):
     """代理抓取 RSS — 绕过前端 CORS/UA 限制"""
     start = time.time()
+    _guard_url(req.url)
     try:
         async with httpx.AsyncClient(timeout=req.timeout) as client:
             resp = await client.get(
@@ -135,6 +157,7 @@ async def validate_source(
     """验证单个 RSS 源 — 连通性 + 格式 + 字段完整性"""
     issues = []
     start = time.time()
+    _guard_url(req.url)
 
     # 1. 连通性测试
     try:
@@ -166,7 +189,9 @@ async def validate_source(
         return {"status": "error", "issues": [{"type": "error", "detail": str(e)[:200]}], "fields_ok": False}
 
     # 2. XML/RSS 格式校验
-    parsed = feedparser.parse(raw)
+    # feedparser 是同步解析，且此端点在用户请求路径上（点「检测」即触发），
+    # 阻塞事件循环的影响比后台抓取更直接，故同样卸载到线程池。
+    parsed = await asyncio.to_thread(feedparser.parse, raw)
     if parsed.bozo:
         issues.append({"type": "parse_error", "detail": f"格式解析异常: {str(parsed.bozo_exception)[:200]}"})
 
@@ -178,9 +203,12 @@ async def validate_source(
     fields_ok = True
     missing_fields = set()
     for entry in entries[:5]:
-        if not entry.get("title"): missing_fields.add("title")
-        if not entry.get("link"): missing_fields.add("link")
-        if not entry.get("published") and not entry.get("updated"): missing_fields.add("published")
+        if not entry.get("title"):
+            missing_fields.add("title")
+        if not entry.get("link"):
+            missing_fields.add("link")
+        if not entry.get("published") and not entry.get("updated"):
+            missing_fields.add("published")
     if missing_fields:
         fields_ok = False
         issues.append({"type": "missing_fields", "detail": f"缺少字段: {', '.join(sorted(missing_fields))}"})
@@ -209,6 +237,16 @@ async def validate_all_sources(
 
     for src in sources:
         start = time.time()
+        # 库里的源理论上都是公网地址，仍做一次校验，避免历史脏数据
+        # 或手工改库后把 validate-all 变成内网扫描器
+        ok_url, reason = validate_public_url(src.url)
+        if not ok_url:
+            results.append({
+                "id": src.id, "name": src.name, "url": src.url,
+                "status": "error", "detail": f"地址被安全策略拒绝: {reason}",
+                "health": get_feed_health(src.id),
+            })
+            continue
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.get(
@@ -240,8 +278,15 @@ async def validate_all_sources(
 
 
 @router.get("/health/{source_id}")
-async def source_health(source_id: int):
-    """获取单个源的运行状况统计"""
+async def source_health(
+    source_id: int,
+    _user: User = Depends(get_current_user),
+):
+    """
+    获取单个源的运行状况统计。
+
+    前端订阅源卡片的状态指示灯会用到它（此前 UI 上写死了 "unknown"）。
+    """
     return get_feed_health(source_id)
 
 
@@ -256,11 +301,24 @@ async def opml_export(
     result = await db.execute(select(Source))
     sources = result.scalars().all()
 
+    # 安全修复：原先直接用 f-string 拼接 XML，而订阅源名称/地址由用户可控，
+    # 名称里带引号或 `><outline ...` 就能注入任意节点（可指向攻击者的 xmlUrl）。
+    # 这里改用 xml.sax.saxutils.escape 做属性转义。
+    from urllib.parse import urlparse as _urlparse
+    from xml.sax.saxutils import escape as _xml_escape
+
+    def _attr(v) -> str:
+        return _xml_escape(str(v or ""), {'"': "&quot;", "'": "&apos;"})
+
     outlines = []
     for src in sources:
+        url = str(src.url or "")
+        # 只导出 http/https，避免把 file:// 之类的危险地址写进 OPML
+        if _urlparse(url).scheme not in ("http", "https"):
+            continue
         outlines.append(
-            f'      <outline text="{src.name}" title="{src.name}" '
-            f'type="rss" xmlUrl="{src.url}" />'
+            f'      <outline text="{_attr(src.name)}" title="{_attr(src.name)}" '
+            f'type="rss" xmlUrl="{_attr(url)}" />'
         )
 
     xml = '<?xml version="1.0" encoding="UTF-8"?>\n'

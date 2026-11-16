@@ -10,17 +10,20 @@ fufu新闻 - 阅读历史接口
 """
 import logging
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, delete
+
+from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.models.article import Article
+from app.models.history import ReadHistory
 from app.models.source import Source
 from app.models.user import User
-from app.models.history import ReadHistory
-from app.schemas.history import ReadHistoryRecord, HistoryItem, HistoryListResponse
-from app.schemas.response import success, error
-from app.api.deps import get_current_user
+from app.schemas.history import HistoryItem, ReadHistoryRecord
+from app.schemas.response import error, success
+from app.services.learning import record_feedback
 
 logger = logging.getLogger("fufu.history")
 
@@ -167,6 +170,16 @@ async def record_history(
         # 标记文章为已读
         if not article.is_read:
             article.is_read = True
+
+        # 自学习反馈回流：把本次阅读时长 + 收藏状态 + 文章标签喂给兴趣画像，
+        # 让推荐引擎随使用逐步学会用户偏好（失败静默，不影响主流程）。
+        await record_feedback(
+            db,
+            user.id,
+            article.tags or [],
+            read_duration=duration,
+            is_favorite=bool(article.is_favorite),
+        )
 
         await db.flush()
 

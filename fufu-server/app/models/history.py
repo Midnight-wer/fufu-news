@@ -4,11 +4,16 @@ fufu新闻 - 阅读历史数据模型
 定义 ReadHistory（阅读历史）ORM 模型。
 每个用户在阅读文章时自动记录阅读历史，包括阅读时间和阅读时长。
 """
+from datetime import datetime, timezone
+
 from sqlalchemy import (
-    String, Integer, DateTime, ForeignKey, UniqueConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column
-from datetime import datetime, timezone
+
 from app.core.database import Base
 
 

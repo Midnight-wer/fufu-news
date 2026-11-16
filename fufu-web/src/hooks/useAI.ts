@@ -55,27 +55,6 @@ export function useAITag() {
   });
 }
 
-export function useAIProcess() {
-  const qc = useQueryClient();
-  const checkAchievement = useCheckAchievement();
-  const aiConfig = useAiConfig();
-  return useMutation<unknown, Error, number>({
-    mutationFn: async (articleId: number) => {
-      const { data } = await client.post(`/ai/process/${articleId}`, aiConfig);
-      return data;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['article'] });
-      qc.invalidateQueries({ queryKey: ['articles'] });
-      checkAchievement.mutate({ key: 'first_ai' });
-    },
-    onError: (error: any) => {
-      const detail = error?.response?.data?.detail || error?.message || 'AI 服务连接失败';
-      console.error('AI 处理失败:', detail);
-    },
-  });
-}
-
 export function useAIProcessAll() {
   const qc = useQueryClient();
   const aiConfig = useAiConfig();
@@ -112,10 +91,7 @@ export function useGenerateDeepSummary() {
   const aiConfig = useAiConfig();
   return useMutation<unknown, Error, number>({
     mutationFn: async (articleId: number) => {
-      const { data } = await client.post(
-        `/ai/deep-summarize/${articleId}`,
-        aiConfig,
-      );
+      const { data } = await client.post(`/ai/deep-summarize/${articleId}`, aiConfig);
       return data;
     },
     onSuccess: () => {

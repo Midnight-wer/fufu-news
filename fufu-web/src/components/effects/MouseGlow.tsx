@@ -2,8 +2,11 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { motion, useMotionValue, useSpring } from 'framer-motion';
 import { anim } from '@/config/animation';
 import { createAnimationLock } from '@/lib/animation-lock';
+import { useSettingsStore } from '@/stores/settingsStore';
 
 export default function MouseGlow() {
+  const effectIntensity = useSettingsStore((s) => s.settings.effectIntensity);
+  if (effectIntensity <= 0) return null;
   const { size, stiffness, damping, mass, opacity, blur } = anim.mouseGlow;
   const [visible, setVisible] = useState(false);
   const mx = useMotionValue(0);
@@ -89,7 +92,7 @@ export default function MouseGlow() {
           translateX: '-50%',
           translateY: '-50%',
           willChange: 'transform',
-          background: `radial-gradient(circle at center, rgba(255,185,145,${opacity}) 0%, rgba(255,170,135,${opacity * 0.4}) 30%, rgba(255,155,125,${opacity * 0.1}) 55%, transparent 75%)`,
+          background: `radial-gradient(circle at center, rgba(var(--fufu-teal), ${opacity}) 0%, rgba(var(--fufu-teal), ${opacity * 0.4}) 30%, rgba(var(--fufu-teal), ${opacity * 0.1}) 55%, transparent 75%)`,
           filter: `blur(${blur}px)`,
         }}
       />

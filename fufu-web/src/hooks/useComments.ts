@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { commentApi, type CommentsResponse } from '../api/comments';
+import { unwrapOr } from '../api/unwrap';
 
 const EMPTY_RESPONSE: CommentsResponse = {
   items: [],
@@ -19,8 +20,8 @@ export function useComments(
     queryKey: ['comments', articleId, page, pageSize, sort],
     queryFn: async () => {
       const res = await commentApi.list(articleId!, page, pageSize, sort);
-      // API 返回 { code, data: { items, total, page, page_size }, message }
-      return (res.data || EMPTY_RESPONSE) as CommentsResponse;
+      // api 层已解包一次；这里再兜一层防止后端异常时拿到 null（unwrap 幂等，安全）
+      return unwrapOr<CommentsResponse>(res, EMPTY_RESPONSE);
     },
     enabled: !!articleId,
     placeholderData: (prev) => prev ?? EMPTY_RESPONSE,

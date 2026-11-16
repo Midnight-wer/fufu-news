@@ -17,122 +17,28 @@ fufu新闻 - 排行榜接口
 """
 import logging
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
+
+from fastapi import APIRouter, Depends, Query, Request
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, text
+
+from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.models.article import Article
-from app.models.source import Source
 from app.models.ranking import ArticleStats, ViewLog
+from app.models.source import Source
 from app.models.user import User
-from app.schemas.ranking import RankingItem, RankingResponse, HitResponse
-from app.schemas.response import success, error
-from app.api.deps import get_current_user
+from app.schemas.ranking import RankingItem, RankingResponse
+from app.schemas.response import error, success
+from app.services.stats import (
+    _determine_trend_with_history,
+    calculate_hot_score,
+    determine_hot_label,
+)
 
 logger = logging.getLogger("fufu.ranking")
 
 router = APIRouter(tags=["排行榜"])
-
-
-# ========== 热度计算公式 ==========
-
-def calculate_hot_score(
-    view_count: int,
-    comment_count: int,
-    collect_count: int,
-    published_at: datetime | None,
-    fetched_at: datetime,
-) -> float:
-    """
-    根据优化方案的热度计算公式计算文章热度分。
-
-    参数:
-        view_count: 浏览/点击数
-        comment_count: 评论数
-        collect_count: 收藏数
-        published_at: 文章原始发布时间（可为 None）
-        fetched_at: 文章抓取入库时间（兜底用）
-
-    返回:
-        float: 热度分（越大越热）
-    """
-    click_weight = 0.6
-    comment_weight = 0.3
-    collect_weight = 0.1
-
-    # 时间衰减：较新的内容获得较高权重
-    # published_at 可能为 None，此时用 fetched_at 兜底
-    ref_time = published_at if published_at is not None else fetched_at
-    hours_since_publish = max(
-        (datetime.now(timezone.utc) - ref_time.replace(tzinfo=timezone.utc)).total_seconds() / 3600,
-        0.1  # 最小 0.1 小时，避免除以零
-    )
-    time_decay = 1.0 / (1.0 + hours_since_publish / 24.0)
-
-    hot_score = (
-        view_count * click_weight +
-        comment_count * comment_weight +
-        collect_count * collect_weight
-    ) * time_decay
-
-    return round(hot_score, 4)
-
-
-def determine_hot_label(hot_score: float, published_at: datetime | None, fetched_at: datetime) -> str | None:
-    """
-    根据热度分和发布时间确定热度标签。
-
-    规则:
-    - "爆": hot_score >= 100
-    - "热": hot_score >= 50
-    - "新": 文章发布在 24 小时内（且不在上述区间）
-    - None: 普通
-
-    参数:
-        hot_score: 热度分
-        published_at: 文章发布时间
-        fetched_at: 抓取时间
-
-    返回:
-        str | None: 热度标签
-    """
-    if hot_score >= 100:
-        return "爆"
-    if hot_score >= 50:
-        return "热"
-
-    ref_time = published_at if published_at is not None else fetched_at
-    if ref_time:
-        if ref_time.tzinfo is None:
-            ref_time = ref_time.replace(tzinfo=timezone.utc)
-        if (datetime.now(timezone.utc) - ref_time).total_seconds() < 24 * 3600:
-            return "新"
-
-    return None
-
-
-def determine_trend(published_at: datetime | None, fetched_at: datetime) -> str:
-    """
-    确定趋势标识。
-
-    规则:
-    - "new": 文章发布在 24 小时内
-    - "same": 其他情况（后续可扩展为对比上期排名）
-
-    参数:
-        published_at: 文章发布时间
-        fetched_at: 抓取时间
-
-    返回:
-        str: 趋势标识
-    """
-    ref_time = published_at if published_at is not None else fetched_at
-    if ref_time:
-        if ref_time.tzinfo is None:
-            ref_time = ref_time.replace(tzinfo=timezone.utc)
-        if (datetime.now(timezone.utc) - ref_time).total_seconds() < 24 * 3600:
-            return "new"
-    return "same"
 
 
 # ========== 辅助：获取时间窗口 ==========
@@ -174,10 +80,9 @@ async def _get_ranking(
     """
     window = _time_window(period)
     cutoff = datetime.now(timezone.utc) - window
+    now = datetime.now(timezone.utc)
 
-    # 统计时间窗口内每篇文章的浏览数（按 IP 去重，1h 内同一 IP 同一文章只计一次）
-    # 聚合：按 article_id 统计不重复的 (ip_address, viewed_at hour) 数
-    # 简化做法：统计时间窗口内 view_log 的行数（已在前端/API 层做 1h 去重）
+    # 统计时间窗口内每篇文章的浏览数
     view_counts_query = (
         select(
             ViewLog.article_id,
@@ -188,46 +93,83 @@ async def _get_ranking(
         .subquery()
     )
 
-    # 主查询：关联 article_stats、article、source
-    # 使用 LEFT JOIN 确保即使没有 stats 记录也能展示（只有浏览记录）
-    main_query = (
-        select(
-            Article.id,
-            Article.title,
-            Article.image_url,
-            Article.published_at,
-            Article.fetched_at,
-            ArticleStats.view_count,
-            ArticleStats.comment_count,
-            ArticleStats.collect_count,
-            Source.name.label("source_name"),
-            func.coalesce(view_counts_query.c.window_views, 0).label("window_views"),
-        )
-        .select_from(Article)
-        .join(Source, Article.source_id == Source.id)
-        .outerjoin(ArticleStats, Article.id == ArticleStats.article_id)
-        .join(view_counts_query, Article.id == view_counts_query.c.article_id)
-        .order_by(func.coalesce(view_counts_query.c.window_views, 0).desc())
-        .limit(limit)
-    )
+    # ---- 修复说明 ----
+    # 原实现有两个致命问题，导致榜单数据链断裂：
+    # 1. `join(view_counts_query, ...)` 是 INNER JOIN —— 没有任何 ViewLog 记录时
+    #    结果集为空，排行榜永远显示"还没有热榜数据～"（新装用户必然如此）。
+    # 2. 排序键是 window_views 而不是算出来的 hot_score，
+    #    comment_count(30%) / collect_count(10%) / 时间衰减全部不参与排序，
+    #    热度公式等于白算；且三档共用同一批数据，日/周/月没有区分度。
+    #
+    # 现在改为：LEFT JOIN + 按 hot_score 排序 + 用窗口内的真实浏览数计分，
+    # 并在候选不足时用最新文章兜底，保证榜单不空。
 
-    result = await db.execute(main_query)
-    rows = result.all()
+    def _build_query(exclude_ids: list[int] | None = None, max_rows: int | None = None):
+        q = (
+            select(
+                Article.id,
+                Article.title,
+                Article.image_url,
+                Article.published_at,
+                Article.fetched_at,
+                ArticleStats.view_count,
+                ArticleStats.comment_count,
+                ArticleStats.collect_count,
+                ArticleStats.hot_score.label("prev_hot_score"),
+                Source.name.label("source_name"),
+                func.coalesce(view_counts_query.c.window_views, 0).label("window_views"),
+            )
+            .select_from(Article)
+            .join(Source, Article.source_id == Source.id)
+            .outerjoin(ArticleStats, Article.id == ArticleStats.article_id)
+            .outerjoin(view_counts_query, Article.id == view_counts_query.c.article_id)
+        )
+        if exclude_ids:
+            q = q.where(Article.id.notin_(exclude_ids))
+        q = q.order_by(Article.fetched_at.desc())
+        if max_rows is not None:
+            q = q.limit(max_rows)
+        return q
+
+    # 候选池：时间窗口内抓取的文章，或窗口内有浏览记录的文章
+    candidate_query = (
+        _build_query()
+        .where(
+            or_(
+                Article.fetched_at >= cutoff,
+                func.coalesce(view_counts_query.c.window_views, 0) > 0,
+            )
+        )
+        .limit(limit * 3)  # 多取一些，排序后再截断
+    )
+    result = await db.execute(candidate_query)
+    rows = list(result.all())
+
+    # 候选不足时用最新文章补齐，保证榜单永远不空
+    if len(rows) < limit:
+        exclude = [r[0] for r in rows]
+        filler = await db.execute(
+            _build_query(exclude_ids=exclude, max_rows=limit * 3 - len(rows))
+        )
+        rows.extend(filler.all())
 
     # 计算热度分并构建排行条目
-    items = []
-    now = datetime.now(timezone.utc)
-    for rank_idx, row in enumerate(rows, start=1):
+    scored: list[tuple[float, datetime, RankingItem]] = []
+    for row in rows:
         article_id = row[0]
         title = row[1] or ""
         image_url = row[2]
         published_at = row[3]
         fetched_at = row[4] or now
-        view_count = row[5] or 0
         comment_count = row[6] or 0
         collect_count = row[7] or 0
-        source_name = row[8] or ""
-        window_views = row[9] or 0
+        prev_hot_score = row[8]
+        source_name = row[9] or ""
+        window_views = row[10] or 0
+
+        # 计分优先用「窗口内的真实浏览数」；浏览量用窗口值与累计值的较大者，
+        # 避免历史累计把旧文章永久顶在榜首。
+        view_count = max(window_views, row[5] or 0 if window_views == 0 else window_views)
 
         hot_score = calculate_hot_score(
             view_count=view_count,
@@ -237,8 +179,8 @@ async def _get_ranking(
             fetched_at=fetched_at,
         )
 
-        items.append(RankingItem(
-            rank=rank_idx,
+        item = RankingItem(
+            rank=0,  # 排序后再赋值
             article_id=article_id,
             title=title,
             source_name=source_name,
@@ -247,19 +189,35 @@ async def _get_ranking(
             view_count=view_count,
             comment_count=comment_count,
             collect_count=collect_count,
-            trend=determine_trend(published_at, fetched_at),
+            trend=_determine_trend_with_history(
+                published_at, fetched_at, hot_score, prev_hot_score
+            ),
             hot_label=determine_hot_label(hot_score, published_at, fetched_at),
-        ))
-
-    # 回写热度分到 article_stats
-    for item in items:
-        stats_result = await db.execute(
-            select(ArticleStats).where(ArticleStats.article_id == item.article_id)
         )
-        stats = stats_result.scalar_one_or_none()
-        if stats:
-            stats.hot_score = item.hot_score
-            stats.calculated_at = now
+        scored.append((hot_score, fetched_at, item))
+
+    # 按热度分降序；同分时新的在前
+    scored.sort(key=lambda t: (t[0], t[1]), reverse=True)
+
+    items: list[RankingItem] = []
+    for rank_idx, (_score, _fetched, item) in enumerate(scored[:limit], start=1):
+        item.rank = rank_idx
+        items.append(item)
+
+    # 回写热度分（批量查询，避免逐条 select 的 N+1）
+    if items:
+        article_ids = [i.article_id for i in items]
+        stats_rows = (
+            await db.execute(
+                select(ArticleStats).where(ArticleStats.article_id.in_(article_ids))
+            )
+        ).scalars().all()
+        by_article = {s.article_id: s for s in stats_rows}
+        for item in items:
+            stats = by_article.get(item.article_id)
+            if stats:
+                stats.hot_score = item.hot_score
+                stats.calculated_at = now
 
     await db.flush()
 

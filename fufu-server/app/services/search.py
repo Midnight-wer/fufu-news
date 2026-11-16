@@ -155,7 +155,9 @@ async def search_ddgs(keyword: str, max_results: int = 5) -> list[dict]:
 async def search_ai(keyword: str) -> list[dict]:
     """AI 搜索（带缓存 + 重试）"""
     import json
+
     import httpx
+
     from app.core.config import settings
 
     if not keyword or not keyword.strip():

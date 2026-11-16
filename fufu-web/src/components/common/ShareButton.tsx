@@ -1,13 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  ShareNetwork,
-  Link,
-  ChatCircle,
-  Globe,
-  DeviceMobile,
-  X,
-} from '@phosphor-icons/react';
+import { ShareNetwork, Link, ChatCircle, Globe, DeviceMobile, X } from '@phosphor-icons/react';
 import { useCompanionStore } from '../../stores/companionStore';
 
 interface ShareButtonProps {
@@ -60,8 +53,7 @@ function supportsNativeShare(): boolean {
  */
 function isTouchDevice(): boolean {
   return (
-    typeof window !== 'undefined' &&
-    ('ontouchstart' in window || navigator.maxTouchPoints > 0)
+    typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
   );
 }
 
@@ -140,21 +132,13 @@ export default function ShareButton({
 
   // 微博分享
   const handleWeibo = useCallback(() => {
-    window.open(
-      weiboShareUrl(shareTitle, shareUrl, shareImage),
-      '_blank',
-      'noopener,noreferrer'
-    );
+    window.open(weiboShareUrl(shareTitle, shareUrl, shareImage), '_blank', 'noopener,noreferrer');
     setIsOpen(false);
   }, [shareTitle, shareUrl, shareImage]);
 
   // Twitter 分享
   const handleTwitter = useCallback(() => {
-    window.open(
-      twitterShareUrl(shareTitle, shareUrl),
-      '_blank',
-      'noopener,noreferrer'
-    );
+    window.open(twitterShareUrl(shareTitle, shareUrl), '_blank', 'noopener,noreferrer');
     setIsOpen(false);
   }, [shareTitle, shareUrl]);
 
@@ -183,11 +167,7 @@ export default function ShareButton({
     {
       key: 'copy',
       label: copied ? '已复制!' : '复制链接',
-      icon: copied ? (
-        <span className="text-fufu-mint text-sm">✓</span>
-      ) : (
-        <Link size={18} />
-      ),
+      icon: copied ? <span className="text-fufu-mint text-sm">✓</span> : <Link size={18} />,
       action: handleCopyLink,
     },
     {
@@ -253,7 +233,7 @@ export default function ShareButton({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-40 md:hidden"
+              className="fixed inset-0 z-[60] md:hidden"
               onClick={() => setIsOpen(false)}
             />
 

@@ -1,12 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import {
-  House,
-  Fire,
-  Star,
-  MagnifyingGlass,
-  Gear,
-} from '@phosphor-icons/react';
+import { House, Fire, Star, MagnifyingGlass, Gear } from '@phosphor-icons/react';
 
 const navItems = [
   { to: '/articles', icon: House, label: '首页', emoji: '🏠' },
@@ -42,7 +36,8 @@ export default function MobileNav() {
       <div
         className="absolute top-0 left-0 right-0 h-px"
         style={{
-          background: 'linear-gradient(90deg, transparent, rgb(var(--fufu-teal)) 30%, rgb(var(--fufu-pink)) 70%, transparent)',
+          background:
+            'linear-gradient(90deg, transparent, rgb(var(--fufu-teal)) 30%, rgb(var(--fufu-pink)) 70%, transparent)',
           opacity: 0.4,
         }}
       />

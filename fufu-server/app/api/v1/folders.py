@@ -11,20 +11,24 @@ fufu新闻 - 收藏夹文件夹接口
 - GET  /folders/{folder_id}/articles         → 获取文件夹内的文章列表
 - POST /folders/move                         → 移动文章到另一个文件夹
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+
+from app.api.deps import get_current_user
 from app.core.database import get_db
-from app.models.user import User
 from app.models.article import Article
 from app.models.favorite import FavoriteFolder, FavoriteFolderItem
 from app.models.source import Source
+from app.models.user import User
 from app.schemas.folder import (
-    FolderCreate, FolderUpdate, FolderResponse,
-    FolderListResponse, FolderArticlesResponse, MoveArticleRequest,
+    FolderCreate,
+    FolderResponse,
+    FolderUpdate,
+    MoveArticleRequest,
 )
-from app.api.deps import get_current_user
-import logging
 
 logger = logging.getLogger("fufu.folders")
 

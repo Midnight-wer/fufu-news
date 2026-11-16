@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState, useEffect } from 'react';
+import { useRef, useCallback } from 'react';
 
 /** 防抖回调 — 用于"重新加载"等按钮，delayMs 内只执行一次 */
 export function useDebouncedCallback<T extends (...args: any[]) => any>(
@@ -20,16 +20,4 @@ export function useDebouncedCallback<T extends (...args: any[]) => any>(
     },
     [callback, delayMs],
   ) as unknown as T;
-}
-
-/** 通用防抖值 — 输入框使用 */
-export function useDebounce<T>(value: T, delayMs: number = 500): T {
-  const [debounced, setDebounced] = useState<T>(value);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delayMs);
-    return () => clearTimeout(timer);
-  }, [value, delayMs]);
-
-  return debounced;
 }

@@ -92,7 +92,7 @@ export default function SakuraPetals() {
 
     // 初始化花瓣
     petalsRef.current = Array.from({ length: maxPetals }, () =>
-      createPetal(canvas.width, canvas.height)
+      createPetal(canvas.width, canvas.height),
     );
 
     const startTime = performance.now();
@@ -137,10 +137,6 @@ export default function SakuraPetals() {
   if (!showSakura) return null;
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="fixed inset-0 pointer-events-none"
-      style={{ zIndex: 0 }}
-    />
+    <canvas ref={canvasRef} className="fixed inset-0 pointer-events-none" style={{ zIndex: 0 }} />
   );
 }

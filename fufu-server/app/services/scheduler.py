@@ -17,15 +17,17 @@ fufu新闻 - 定时调度器（v2.2）
 """
 import asyncio
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
+from sqlalchemy import delete, select
+
 from app.core.database import async_session
-from app.models.source import Source
 from app.models.article import Article
 from app.models.feed_log import FeedLog
+from app.models.source import Source
 from app.services.fetcher import fetch_source
-from sqlalchemy import select, delete
 
 logger = logging.getLogger("fufu.scheduler")
 
@@ -297,7 +299,16 @@ def start_scheduler():
     3. 死源清理 — 每 60 分钟（+ 45s 随机抖动）
     4. feed_log 清理 — 每 24 小时（保留 7 天）
     5. 旧文章清理 — 每 24 小时（保留 2 年）
+
+    修复：原先没有 running 守卫，直接调用 scheduler.start()。
+    在 uvicorn --reload、多 worker 或模块被重复导入时会抛
+    SchedulerAlreadyRunningError，或出现多份调度器并发抓取同一批源
+    （写冲突 + 触发源站封禁）。现在改为幂等。
     """
+    if getattr(scheduler, "running", False):
+        logger.warning("调度器已在运行中，跳过重复启动")
+        return False
+
     # 主抓取任务：每 15 分钟
     scheduler.add_job(
         _fetch_all_job,
@@ -350,6 +361,7 @@ def start_scheduler():
         f"死源清理={CLEANUP_INTERVAL}min, "
         f"feed_log保留={FEED_LOG_RETENTION_DAYS}天, 文章保留={ARTICLE_RETENTION_DAYS}天"
     )
+    return True
 
 
 def stop_scheduler():

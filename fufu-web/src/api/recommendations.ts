@@ -1,4 +1,5 @@
 import client from './client';
+import { unwrapOr } from './unwrap';
 
 export interface RecommendationItem {
   article_id: number;
@@ -83,11 +84,15 @@ export async function fetchCategoryRecommendations(
 /**
  * 从后端响应中解包推荐数据。
  * 后端包装格式: { code: 200, data: { items, reasons }, message: "ok" }
+ *
+ * 改用共享的 unwrapOr（对裸返回恒等、对信封解包），
+ * 消除与其他 api 模块重复的手写解包逻辑。
  */
-function unwrapRecommendationResponse(response: any): RecommendationResponse {
-  const inner = response?.data || response;
-  if (inner && typeof inner === 'object' && Array.isArray(inner.items)) {
-    return inner as RecommendationResponse;
+function unwrapRecommendationResponse(response: unknown): RecommendationResponse {
+  const inner = unwrapOr<unknown>(response, null);
+  if (inner && typeof inner === 'object' && !Array.isArray(inner) && 'items' in inner) {
+    const r = inner as RecommendationResponse;
+    return Array.isArray(r.items) ? r : EMPTY_RECOMMENDATION_RESPONSE;
   }
   return EMPTY_RECOMMENDATION_RESPONSE;
 }

@@ -14,14 +14,15 @@ fufu新闻 - 个性化推荐引擎
 """
 import logging
 from datetime import datetime, timezone
+
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_
 
 from app.models.article import Article
-from app.models.source import Source
+from app.models.favorite import FavoriteFolder, FavoriteFolderItem
 from app.models.history import ReadHistory
 from app.models.ranking import ArticleStats
-from app.models.favorite import FavoriteFolder, FavoriteFolderItem
+from app.models.source import Source
 
 logger = logging.getLogger("fufu.recommender")
 
@@ -63,9 +64,28 @@ async def _get_user_read_article_ids(db: AsyncSession, user_id: int) -> set[int]
 
 async def _get_user_preferred_tags(db: AsyncSession, user_id: int, top_n: int = 20) -> list[str]:
     """
-    从用户的阅读历史 + 收藏文章中提取兴趣标签。
-    按出现频率排序，取前 top_n 个。
+    获取用户的兴趣标签（按强度排序）。
+
+    自学习版本：优先读取 UserProfile 画像中学习出的兴趣权重；
+    画像为空时回退到「阅读历史 + 收藏」的启发式统计（原逻辑）。
+    返回的标签按兴趣强度降序排列。
+
+    参数:
+        db: 数据库会话
+        user_id: 用户 ID
+        top_n: 最多返回的标签数
     """
+    # 1. 优先用自学习画像（真实反馈回流后的兴趣强度）
+    try:
+        from app.services.learning import get_interest_weights
+
+        weights = await get_interest_weights(db, user_id)
+        if weights:
+            return [tag for tag, _ in sorted(weights.items(), key=lambda x: x[1], reverse=True)][:top_n]
+    except Exception as e:
+        logger.debug(f"读取兴趣画像失败，回退启发式: {e}")
+
+    # 2. 回退：从阅读历史 + 收藏中统计标签（原逻辑，fail-closed 兜底）
     tag_counter: dict[str, int] = {}
     tag_total_duration: dict[str, int] = {}
 
@@ -109,7 +129,7 @@ async def _get_user_preferred_tags(db: AsyncSession, user_id: int, top_n: int = 
         article_result = await db.execute(
             select(Article.id, Article.tags).where(Article.id.in_(fav_article_ids))
         )
-        for art_id, tags in article_result.all():
+        for _art_id, tags in article_result.all():
             if not tags:
                 continue
             for tag in tags:
@@ -584,7 +604,7 @@ async def get_trending_articles(
         source_counts: dict[int, int] = {}
         diverse_items = []
         for row in rows:
-            source_id = row.article_id  # 这里实际用的是 article id，我们需要 source_name
+              # 这里实际用的是 article id，我们需要 source_name
             # 用 source_name 做去重判断
             source_name = row.source_name or ""
             s_key = source_name
@@ -642,7 +662,7 @@ async def get_category_recommendations(
         list[dict]: 分类趋势文章列表
     """
     try:
-        # 分类关键词映射
+        # 分类关键词映射（公开分类/前端计数见 app.core.categories.CATEGORY_NAMES；此处为推荐的细分关键词）
         category_keywords: dict[str, list[str]] = {
             "科技": ["科技", "技术", "编程", "AI", "人工智能", "互联网", "数码", "软件", "硬件"],
             "游戏": ["游戏", "电竞", "主机", "手游", "PC游戏", "独立游戏"],

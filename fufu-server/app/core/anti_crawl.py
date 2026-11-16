@@ -17,17 +17,14 @@ Layer 3 — 行为分析：
 注意：采用"宁可放过也不误杀"原则，阈值设置较宽松。
 """
 
-import time
 import asyncio
 import logging
 import re
+import time
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import Optional
 
-from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import Response
 
 from app.core.config import settings
 
@@ -149,7 +146,6 @@ class AntiCrawlMiddleware:
             return
 
         # 正常处理请求
-        path = request.url.path
         await self.app(scope, receive, send)
 
         # 行为分析 — 请求后记录（需要状态码）
@@ -193,7 +189,7 @@ class AntiCrawlMiddleware:
         """内部封禁方法（与 block_ip 相同）。"""
         await self.block_ip(ip, reason)
 
-    def _is_bad_ua(self, ua: Optional[str]) -> bool:
+    def _is_bad_ua(self, ua: str | None) -> bool:
         """
         检查 User-Agent 是否为已知爬虫或无效。
 
@@ -209,9 +205,7 @@ class AntiCrawlMiddleware:
 
         # 检查是否匹配已知爬虫/扫描器特征
         ua_lower = ua.lower()
-        for pattern in _KNOWN_CRAWLER_RE:
-            if pattern.search(ua_lower):
-                return True
+        return any(pattern.search(ua_lower) for pattern in _KNOWN_CRAWLER_RE)
 
         return False
 
@@ -313,7 +307,7 @@ class AntiCrawlMiddleware:
 
 
 # ========== 全局反爬虫中间件实例 ==========
-_anti_crawl: Optional[AntiCrawlMiddleware] = None
+_anti_crawl: AntiCrawlMiddleware | None = None
 
 
 def get_anti_crawl() -> AntiCrawlMiddleware:
@@ -356,13 +350,13 @@ def _get_client_ip_from_scope(scope: dict) -> str:
     return "unknown"
 
 
-def _get_header(scope: dict, name: str) -> Optional[str]:
+def _get_header(scope: dict, name: str) -> str | None:
     """从 ASGI scope 中获取指定请求头。"""
     headers = dict(scope.get("headers", []))
     return _decode_header(headers, name.encode("latin-1"))
 
 
-def _decode_header(headers: dict, key: bytes) -> Optional[str]:
+def _decode_header(headers: dict, key: bytes) -> str | None:
     """解码 ASGI header 字节为字符串。"""
     for k, v in headers.items():
         if k.lower() == key.lower():

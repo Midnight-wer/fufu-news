@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MagnifyingGlass, X, ClockCounterClockwise, Lightbulb } from '@phosphor-icons/react';
-import client from '../../api/client';
+import { fetchSearchSuggestions } from '../../api/search';
 
 interface Suggestion {
   title: string;
@@ -20,7 +20,11 @@ const HISTORY_KEY = 'fufu-search-history';
 const MAX_SUGGESTIONS = 5;
 
 function getHistory(): string[] {
-  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch { return []; }
+  try {
+    return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+  } catch {
+    return [];
+  }
 }
 
 function saveHistory(term: string) {
@@ -43,6 +47,8 @@ export default function SearchAutocomplete({
 
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLFormElement>(null);
+  // 持有上一次建议请求的 AbortController，用于取消过期请求
+  const abortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Fetch suggestions with debounce
@@ -59,21 +65,33 @@ export default function SearchAutocomplete({
     setSuggestionsLoading(true);
     setActiveIndex(-1);
 
+    // 每次发起新请求前先取消上一次：
+    // 否则快速输入时「先发出的请求后返回」会把旧关键词的结果覆盖掉新结果。
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     debounceRef.current = setTimeout(async () => {
       try {
-        const { data } = await client.get('/search/suggest', {
-          params: { q: query.trim(), limit: MAX_SUGGESTIONS },
-        });
-        setSuggestions(data?.data ?? []);
-      } catch {
+        const list = await fetchSearchSuggestions<Suggestion>(
+          query.trim(),
+          MAX_SUGGESTIONS,
+          controller.signal,
+        );
+        if (controller.signal.aborted) return;
+        setSuggestions(list);
+      } catch (err) {
+        if (controller.signal.aborted || (err as { code?: string })?.code === 'ERR_CANCELED') {
+          return; // 主动取消，不更新状态
+        }
         setSuggestions([]);
       } finally {
-        setSuggestionsLoading(false);
+        if (!controller.signal.aborted) setSuggestionsLoading(false);
       }
     }, SUGGEST_DEBOUNCE_MS);
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
+      controller.abort();
     };
   }, [query]);
 
@@ -161,17 +179,27 @@ export default function SearchAutocomplete({
     inputRef.current?.focus();
   };
 
-  const showDropdown = isOpen && (suggestions.length > 0 || (!query.trim() && history.length > 0) || (query.trim() && suggestionsLoading));
+  const showDropdown =
+    isOpen &&
+    (suggestions.length > 0 ||
+      (!query.trim() && history.length > 0) ||
+      (query.trim() && suggestionsLoading));
 
   return (
     <form onSubmit={handleSubmit} className="relative mb-4" ref={containerRef}>
       <div className="relative">
-        <MagnifyingGlass size={22} className="absolute left-5 top-1/2 -translate-y-1/2 text-fufu-text-muted z-10" />
+        <MagnifyingGlass
+          size={22}
+          className="absolute left-5 top-1/2 -translate-y-1/2 text-fufu-text-muted z-10"
+        />
         <input
           ref={inputRef}
           className="fufu-input pl-12 pr-12 text-lg rounded-fufu-input"
           value={query}
-          onChange={(e) => { onQueryChange(e.target.value); if (!isOpen) setIsOpen(true); }}
+          onChange={(e) => {
+            onQueryChange(e.target.value);
+            if (!isOpen) setIsOpen(true);
+          }}
           onFocus={handleFocus}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
@@ -227,9 +255,10 @@ export default function SearchAutocomplete({
                     onClick={() => handleTermClick(s.title)}
                     onMouseEnter={() => setActiveIndex(idx)}
                     className={`w-full text-left px-4 py-2 font-body text-sm flex items-center gap-3 transition-colors
-                      ${activeIndex === idx
-                        ? 'bg-fufu-teal/10 text-fufu-teal-deep'
-                        : 'text-fufu-text hover:bg-fufu-cream'
+                      ${
+                        activeIndex === idx
+                          ? 'bg-fufu-teal/10 text-fufu-teal-deep'
+                          : 'text-fufu-text hover:bg-fufu-cream'
                       }`}
                   >
                     <span className="text-fufu-text-muted text-xs">💡</span>
@@ -240,35 +269,38 @@ export default function SearchAutocomplete({
             )}
 
             {/* History (when no suggestions or no query) */}
-            {!suggestionsLoading && (!query.trim() || suggestions.length === 0) && history.length > 0 && (
-              <div className="py-1">
-                {suggestions.length > 0 && <div className="mx-4 border-t border-fufu-teal/5" />}
-                <div className="px-4 py-1.5">
-                  <span className="font-cute text-[10px] text-fufu-text-muted flex items-center gap-1">
-                    <ClockCounterClockwise size={12} /> 搜索历史
-                  </span>
-                </div>
-                {history.slice(0, 5).map((t, idx) => {
-                  const histIdx = suggestions.length + idx;
-                  return (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => handleTermClick(t)}
-                      onMouseEnter={() => setActiveIndex(histIdx)}
-                      className={`w-full text-left px-4 py-2 font-body text-sm flex items-center gap-3 transition-colors
-                        ${activeIndex === histIdx
-                          ? 'bg-fufu-teal/10 text-fufu-teal-deep'
-                          : 'text-fufu-text hover:bg-fufu-cream'
+            {!suggestionsLoading &&
+              (!query.trim() || suggestions.length === 0) &&
+              history.length > 0 && (
+                <div className="py-1">
+                  {suggestions.length > 0 && <div className="mx-4 border-t border-fufu-teal/5" />}
+                  <div className="px-4 py-1.5">
+                    <span className="font-cute text-[10px] text-fufu-text-muted flex items-center gap-1">
+                      <ClockCounterClockwise size={12} /> 搜索历史
+                    </span>
+                  </div>
+                  {history.slice(0, 5).map((t, idx) => {
+                    const histIdx = suggestions.length + idx;
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => handleTermClick(t)}
+                        onMouseEnter={() => setActiveIndex(histIdx)}
+                        className={`w-full text-left px-4 py-2 font-body text-sm flex items-center gap-3 transition-colors
+                        ${
+                          activeIndex === histIdx
+                            ? 'bg-fufu-teal/10 text-fufu-teal-deep'
+                            : 'text-fufu-text hover:bg-fufu-cream'
                         }`}
-                    >
-                      <span className="text-fufu-text-muted text-xs">🕐</span>
-                      <span className="truncate">{t}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+                      >
+                        <span className="text-fufu-text-muted text-xs">🕐</span>
+                        <span className="truncate">{t}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
           </motion.div>
         )}
       </AnimatePresence>

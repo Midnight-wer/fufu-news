@@ -1,27 +1,106 @@
 import { useState, useRef, useEffect } from 'react';
-import { Plus, Trash, ArrowClockwise, Rss, Globe, DownloadSimple, UploadSimple, PencilSimple, Check, X, Lightning, MagnifyingGlass, ShieldCheck } from '@phosphor-icons/react';
+import {
+  Plus,
+  Trash,
+  ArrowClockwise,
+  Rss,
+  Globe,
+  DownloadSimple,
+  UploadSimple,
+  PencilSimple,
+  Check,
+  X,
+  Lightning,
+  MagnifyingGlass,
+  ShieldCheck,
+} from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useQueryClient } from '@tanstack/react-query';
-import client from '../api/client';
-import { useSources, useCreateSource, useDeleteSource, useFetchSource, useUpdateSource } from '../hooks/useSources';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { extractErrorMessage } from '../api/client';
+import {
+  fetchSourceHealth,
+  validateAllSources,
+  validateSource,
+  fetchAllSources,
+  exportOpml,
+  importOpml,
+  type SourceHealth,
+} from '../api/sources';
+import {
+  useSources,
+  useCreateSource,
+  useDeleteSource,
+  useFetchSource,
+  useUpdateSource,
+} from '../hooks/useSources';
 import { useCheckAchievement } from '../hooks/useAchievements';
 import { ClickRippleWrapper } from '../components/effects/ClickRipple';
 
 type HealthStatus = 'ok' | 'warning' | 'error' | 'unknown';
 
-function HealthDot({ status }: { status: HealthStatus }) {
+// SourceHealth 类型已移至 api/sources（单一来源，避免页面与接口定义漂移）
+
+/**
+ * 订阅源健康状态。
+ *
+ * 修复：卡片上的状态指示灯原先是**写死的 `status="unknown"`**，
+ * 后端其实早就实现了 `/sources/health/{id}`（返回成功率、平均延迟、连续失败数），
+ * 但前端从未调用过 —— 每个源永远显示灰色"未知"。
+ * 现在接上真实接口。
+ */
+function useSourceHealth(sourceId: number | undefined) {
+  return useQuery<SourceHealth | null>({
+    queryKey: ['source-health', sourceId],
+    queryFn: async () => {
+      // sourceId 可能为 undefined（enabled 会拦截），这里收窄类型后再请求
+      if (sourceId === undefined) return null;
+      return fetchSourceHealth(sourceId);
+    },
+    enabled: !!sourceId,
+    staleTime: 60_000,
+    retry: false,
+  });
+}
+
+/** 把后端健康统计映射成指示灯状态 */
+function healthToStatus(h: SourceHealth | null | undefined): HealthStatus {
+  if (!h || !h.total) return 'unknown';
+  const rate = h.success_rate ?? 0;
+  if (h.consecutive_fails && h.consecutive_fails >= 3) return 'error';
+  if (rate >= 90) return 'ok';
+  if (rate >= 50) return 'warning';
+  return 'error';
+}
+
+function HealthDot({ status, title }: { status: HealthStatus; title?: string }) {
   const colors: Record<HealthStatus, string> = {
-    ok: 'bg-green-400', warning: 'bg-amber-400', error: 'bg-red-400', unknown: 'bg-gray-300',
+    ok: 'bg-green-400',
+    warning: 'bg-amber-400',
+    error: 'bg-red-400',
+    unknown: 'bg-gray-300',
   };
   const labels: Record<HealthStatus, string> = {
-    ok: '正常', warning: '警告', error: '异常', unknown: '未知',
+    ok: '正常',
+    warning: '警告',
+    error: '异常',
+    unknown: '未知',
   };
   return (
-    <span className="inline-flex items-center gap-1 font-cute text-[10px]">
+    <span className="inline-flex items-center gap-1 font-cute text-[10px]" title={title}>
       <span className={`w-2 h-2 rounded-full ${colors[status]} animate-pulse`} />
       {labels[status]}
     </span>
   );
+}
+
+/** 单个源的健康指示（自己拉数据，避免父组件为整列表重复请求） */
+function SourceHealthDot({ sourceId }: { sourceId: number }) {
+  const { data } = useSourceHealth(sourceId);
+  const status = healthToStatus(data);
+  const title = data?.total
+    ? `成功率 ${data.success_rate}% · 平均延迟 ${data.avg_latency}s · 连续失败 ${data.consecutive_fails ?? 0} 次`
+    : '暂无健康数据，点「健康检测」采集一次';
+  return <HealthDot status={status} title={title} />;
 }
 
 export default function SourcesPage() {
@@ -33,7 +112,12 @@ export default function SourcesPage() {
   const updateSource = useUpdateSource();
   const fetchSource = useFetchSource();
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState<{ name: string; url: string; source_type: 'rss' | 'web'; folder: string }>({ name: '', url: '', source_type: 'rss', folder: '' });
+  const [form, setForm] = useState<{
+    name: string;
+    url: string;
+    source_type: 'rss' | 'web';
+    folder: string;
+  }>({ name: '', url: '', source_type: 'rss', folder: '' });
   const [importMsg, setImportMsg] = useState('');
   const [validateAllLoading, setValidateAllLoading] = useState(false);
   const [validateResults, setValidateResults] = useState<any[] | null>(null);
@@ -47,11 +131,13 @@ export default function SourcesPage() {
     setValidateAllLoading(true);
     setValidateResults(null);
     try {
-      const { data } = await client.post('/sources/validate-all');
-      setValidateResults(data.results);
-      setImportMsg(`验证完成：${data.total} 个源，${data.unhealthy} 个异常`);
+      const result = await validateAllSources();
+      setValidateResults(result.results);
+      setImportMsg(`验证完成：${result.total} 个源，${result.unhealthy} 个异常`);
+      // 验证会刷新后端健康统计，让卡片指示灯立刻更新
+      qc.invalidateQueries({ queryKey: ['source-health'] });
     } catch (err: any) {
-      setImportMsg(err?.response?.data?.detail || '批量验证失败');
+      setImportMsg(extractErrorMessage(err, '批量验证失败'));
     } finally {
       setValidateAllLoading(false);
     }
@@ -62,8 +148,8 @@ export default function SourcesPage() {
     setRssPreviewLoading(true);
     setRssPreviewResult(null);
     try {
-      const { data } = await client.post('/sources/validate', { url: rssPreviewUrl.trim() });
-      setRssPreviewResult(data);
+      const result = await validateSource(rssPreviewUrl.trim());
+      setRssPreviewResult(result);
     } catch {
       setRssPreviewResult({ status: 'error', issues: [{ detail: '请求失败' }] });
     } finally {
@@ -74,43 +160,62 @@ export default function SourcesPage() {
   const handleFetchAll = async () => {
     setFetchAllLoading(true);
     try {
-      const { data } = await client.post('/sources/fetch-all');
-      setImportMsg(data.message || '全量爬取已触发');
+      const result = await fetchAllSources();
+      setImportMsg(result.message || '全量爬取已触发');
       qc.invalidateQueries({ queryKey: ['sources'] });
       qc.invalidateQueries({ queryKey: ['articles'] });
+      qc.invalidateQueries({ queryKey: ['source-health'] });
     } catch (err: any) {
-      setImportMsg(err?.response?.data?.detail || '全量爬取失败');
+      setImportMsg(extractErrorMessage(err, '全量爬取失败'));
     } finally {
       setFetchAllLoading(false);
     }
   };
 
   const categoryIcons: Record<string, { icon: string; color: string }> = {
-    '动漫': { icon: '🌸', color: '#00e5ff' },
-    '二次元': { icon: '💫', color: '#E5A8E1' },
-    '娱乐': { icon: '🎵', color: '#FFB5C5' },
-    '游戏': { icon: '🎮', color: '#A8F1D3' },
-    '科技': { icon: '💻', color: '#C4E4F5' },
-    'Cosplay': { icon: '🎀', color: '#39c5bb' },
-    '科普': { icon: '🔬', color: '#B8D8F0' },
-    '综合': { icon: '📰', color: '#D0C8E0' },
-    '趣味': { icon: '🎲', color: '#FFE8C0' },
-    '文化': { icon: '📚', color: '#E8D4D0' },
+    动漫: { icon: '🌸', color: 'rgb(var(--fufu-teal))' },
+    二次元: { icon: '💫', color: '#E5A8E1' },
+    娱乐: { icon: '🎵', color: '#FFB5C5' },
+    游戏: { icon: '🎮', color: '#A8F1D3' },
+    科技: { icon: '💻', color: '#C4E4F5' },
+    Cosplay: { icon: '🎀', color: 'rgb(var(--fufu-teal-deep))' },
+    科普: { icon: '🔬', color: '#B8D8F0' },
+    综合: { icon: '📰', color: '#D0C8E0' },
+    趣味: { icon: '🎲', color: '#FFE8C0' },
+    文化: { icon: '📚', color: '#E8D4D0' },
   };
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [editForm, setEditForm] = useState({ name: '', url: '', source_type: 'rss' as 'rss' | 'web', folder: '' });
+  const [editForm, setEditForm] = useState({
+    name: '',
+    url: '',
+    source_type: 'rss' as 'rss' | 'web',
+    folder: '',
+  });
   const fileRef = useRef<HTMLInputElement>(null);
   const checkAchievement = useCheckAchievement();
 
+  // 订阅数成就检查。
+  // 修复：依赖数组原先写的是 `safeSources`（数组引用），
+  // 每次 refetch 拿到新数组都会重新触发，导致重复 POST 成就检查。
+  // 改为依赖具体数量（基本类型），并用 ref 保证每个门槛只上报一次。
+  const checkedMilestones = useRef<Set<string>>(new Set());
+  const sourceCount = safeSources.length;
   useEffect(() => {
-    if (safeSources.length >= 5) checkAchievement.mutate({ key: 'source_5' });
-    if (safeSources.length >= 10) checkAchievement.mutate({ key: 'source_10' });
-  }, [safeSources]);
+    for (const [key, threshold] of [
+      ['source_5', 5],
+      ['source_10', 10],
+    ] as const) {
+      if (sourceCount >= threshold && !checkedMilestones.current.has(key)) {
+        checkedMilestones.current.add(key);
+        checkAchievement.mutate({ key });
+      }
+    }
+  }, [sourceCount, checkAchievement]);
 
   const handleExport = async () => {
     try {
-      const { data } = await client.post('/sources/opml-export');
-      const blob = new Blob([data.xml], { type: 'text/xml' });
+      const { xml } = await exportOpml();
+      const blob = new Blob([xml], { type: 'text/xml' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -127,8 +232,10 @@ export default function SourcesPage() {
     if (!file) return;
     try {
       const xml = await file.text();
-      const { data } = await client.post('/sources/opml-import', { xml });
-      setImportMsg(`成功导入 ${data.imported} 个源${data.skipped > 0 ? `，跳过 ${data.skipped} 个重复` : ''}`);
+      const result = await importOpml(xml);
+      setImportMsg(
+        `成功导入 ${result.imported} 个源${result.skipped > 0 ? `，跳过 ${result.skipped} 个重复` : ''}`,
+      );
       qc.invalidateQueries({ queryKey: ['sources'] });
     } catch (err: any) {
       setImportMsg(err?.response?.data?.detail || '导入失败，文件格式可能不对哦～');
@@ -145,7 +252,12 @@ export default function SourcesPage() {
 
   const startEdit = (s: NonNullable<typeof sources>[number]) => {
     setEditingId(s.id);
-    setEditForm({ name: s.name, url: s.url, source_type: s.source_type as 'rss' | 'web', folder: s.folder || '' });
+    setEditForm({
+      name: s.name,
+      url: s.url,
+      source_type: s.source_type as 'rss' | 'web',
+      folder: s.folder || '',
+    });
   };
 
   const cancelEdit = () => {
@@ -163,9 +275,7 @@ export default function SourcesPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h2 className="font-cute text-3xl text-fufu-text">📡 订阅源</h2>
-          <p className="font-body text-sm text-fufu-text/50 mt-1">
-            管理你的新闻来源～
-          </p>
+          <p className="font-body text-sm text-fufu-text/50 mt-1">管理你的新闻来源～</p>
         </div>
         <div className="flex items-center gap-2">
           <input
@@ -229,7 +339,9 @@ export default function SourcesPage() {
           <div className="space-y-1">
             {validateResults.map((r: any) => (
               <div key={r.id} className="flex items-center gap-2 text-xs font-body">
-                <HealthDot status={r.status === 'ok' ? 'ok' : r.status === 'error' ? 'error' : 'warning'} />
+                <HealthDot
+                  status={r.status === 'ok' ? 'ok' : r.status === 'error' ? 'error' : 'warning'}
+                />
                 <span className="text-fufu-text truncate flex-1">{r.name}</span>
                 <span className="text-fufu-text-muted">{r.latency}s</span>
                 {r.health?.success_rate !== undefined && (
@@ -262,14 +374,23 @@ export default function SourcesPage() {
           </button>
         </div>
         {rssPreviewResult && (
-          <div className={`mt-2 p-3 rounded-fufu text-xs font-body ${
-            rssPreviewResult.status === 'ok' ? 'bg-green-50 text-green-700' :
-            rssPreviewResult.status === 'warning' ? 'bg-amber-50 text-amber-700' :
-            'bg-red-50 text-red-700'
-          }`}>
-            <p>状态: {rssPreviewResult.status} | 条目数: {rssPreviewResult.entry_count ?? 0} | 延迟: {rssPreviewResult.latency ?? '?'}s</p>
+          <div
+            className={`mt-2 p-3 rounded-fufu text-xs font-body ${
+              rssPreviewResult.status === 'ok'
+                ? 'bg-green-50 text-green-700'
+                : rssPreviewResult.status === 'warning'
+                  ? 'bg-amber-50 text-amber-700'
+                  : 'bg-red-50 text-red-700'
+            }`}
+          >
+            <p>
+              状态: {rssPreviewResult.status} | 条目数: {rssPreviewResult.entry_count ?? 0} | 延迟:{' '}
+              {rssPreviewResult.latency ?? '?'}s
+            </p>
             {rssPreviewResult.issues?.map((iss: any, i: number) => (
-              <p key={i} className="mt-1">• [{iss.type}] {iss.detail}</p>
+              <p key={i} className="mt-1">
+                • [{iss.type}] {iss.detail}
+              </p>
             ))}
           </div>
         )}
@@ -287,9 +408,7 @@ export default function SourcesPage() {
           >
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="font-cute text-sm text-fufu-text/60 block mb-1">
-                  名称
-                </label>
+                <label className="font-cute text-sm text-fufu-text/60 block mb-1">名称</label>
                 <input
                   className="fufu-input"
                   value={form.name}
@@ -299,9 +418,7 @@ export default function SourcesPage() {
                 />
               </div>
               <div>
-                <label className="font-cute text-sm text-fufu-text/60 block mb-1">
-                  类型
-                </label>
+                <label className="font-cute text-sm text-fufu-text/60 block mb-1">类型</label>
                 <select
                   className="fufu-input"
                   value={form.source_type}
@@ -314,9 +431,7 @@ export default function SourcesPage() {
                 </select>
               </div>
               <div className="col-span-2">
-                <label className="font-cute text-sm text-fufu-text/60 block mb-1">
-                  URL 地址
-                </label>
+                <label className="font-cute text-sm text-fufu-text/60 block mb-1">URL 地址</label>
                 <input
                   className="fufu-input"
                   type="url"
@@ -367,9 +482,7 @@ export default function SourcesPage() {
       ) : safeSources.length === 0 ? (
         <div className="text-center py-20">
           <p className="font-cute text-6xl mb-4">📭</p>
-          <p className="font-cute text-xl text-fufu-text/60">
-            还没有订阅源哦～
-          </p>
+          <p className="font-cute text-xl text-fufu-text/60">还没有订阅源哦～</p>
           <p className="font-body text-sm text-fufu-text/40 mt-2">
             点击「添加订阅」开始你的阅读之旅吧！
           </p>
@@ -391,7 +504,9 @@ export default function SourcesPage() {
                   <div className="fufu-card p-5 space-y-3 border-2 border-fufu-peach/40">
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="font-cute text-xs text-fufu-text/50 block mb-1">名称</label>
+                        <label className="font-cute text-xs text-fufu-text/50 block mb-1">
+                          名称
+                        </label>
                         <input
                           className="fufu-input text-sm py-2"
                           value={editForm.name}
@@ -399,18 +514,27 @@ export default function SourcesPage() {
                         />
                       </div>
                       <div>
-                        <label className="font-cute text-xs text-fufu-text/50 block mb-1">类型</label>
+                        <label className="font-cute text-xs text-fufu-text/50 block mb-1">
+                          类型
+                        </label>
                         <select
                           className="fufu-input text-sm py-2"
                           value={editForm.source_type}
-                          onChange={(e) => setEditForm({ ...editForm, source_type: e.target.value as 'rss' | 'web' })}
+                          onChange={(e) =>
+                            setEditForm({
+                              ...editForm,
+                              source_type: e.target.value as 'rss' | 'web',
+                            })
+                          }
                         >
                           <option value="rss">RSS 订阅</option>
                           <option value="web">网页抓取</option>
                         </select>
                       </div>
                       <div className="col-span-2">
-                        <label className="font-cute text-xs text-fufu-text/50 block mb-1">URL 地址</label>
+                        <label className="font-cute text-xs text-fufu-text/50 block mb-1">
+                          URL 地址
+                        </label>
                         <input
                           className="fufu-input text-sm py-2"
                           value={editForm.url}
@@ -418,7 +542,9 @@ export default function SourcesPage() {
                         />
                       </div>
                       <div>
-                        <label className="font-cute text-xs text-fufu-text/50 block mb-1">分组</label>
+                        <label className="font-cute text-xs text-fufu-text/50 block mb-1">
+                          分组
+                        </label>
                         <input
                           className="fufu-input text-sm py-2"
                           value={editForm.folder}
@@ -454,23 +580,22 @@ export default function SourcesPage() {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-cute text-base text-fufu-text">
-                        {s.name}
-                      </h3>
-                      <p className="font-body text-xs text-fufu-text/60 truncate">
-                        {s.url}
-                      </p>
-                      {s.folder && (() => {
-                        const cat = categoryIcons[s.folder] || { icon: '📁', color: '#D0C8E0' };
-                        return (
-                          <span className="fufu-tag mt-1 font-cute text-xs"
-                            style={{ backgroundColor: cat.color + '20', color: cat.color }}>
-                            {cat.icon} {s.folder}
-                          </span>
-                        );
-                      })()}
+                      <h3 className="font-cute text-base text-fufu-text">{s.name}</h3>
+                      <p className="font-body text-xs text-fufu-text/60 truncate">{s.url}</p>
+                      {s.folder &&
+                        (() => {
+                          const cat = categoryIcons[s.folder] || { icon: '📁', color: '#D0C8E0' };
+                          return (
+                            <span
+                              className="fufu-tag mt-1 font-cute text-xs"
+                              style={{ backgroundColor: cat.color + '20', color: cat.color }}
+                            >
+                              {cat.icon} {s.folder}
+                            </span>
+                          );
+                        })()}
                       <div className="flex items-center gap-2 mt-1">
-                        <HealthDot status="unknown" />
+                        <SourceHealthDot sourceId={s.id} />
                         {s.last_fetched_at && (
                           <span className="text-xs text-fufu-text/50">
                             上次: {new Date(s.last_fetched_at).toLocaleString('zh-CN')}

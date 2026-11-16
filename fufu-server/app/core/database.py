@@ -8,10 +8,12 @@ fufu新闻 - 数据库连接与会话管理
 4. 预定义的稳定 RSS 源清单
 5. 全量/增量爬取接口
 """
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from sqlalchemy.orm import DeclarativeBase
-from app.core.config import settings
 import logging
+
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import DeclarativeBase
+
+from app.core.config import settings
 
 # ========== 数据库引擎 ==========
 # 使用 aiosqlite 异步驱动连接 SQLite 数据库
@@ -65,7 +67,7 @@ async def get_db() -> AsyncSession:
 # ========== 数据库版本迁移 ==========
 # 当前期望的数据库 schema 版本号
 # 每次添加新表/新字段/新索引时递增此数字，并在 _run_migrations() 中添加迁移逻辑
-CURRENT_SCHEMA_VERSION = 8
+CURRENT_SCHEMA_VERSION = 9
 
 
 async def _ensure_schema_version_table(conn):
@@ -366,6 +368,35 @@ async def _run_migrations(conn):
         await conn.exec_driver_sql("INSERT INTO schema_version (version) VALUES (8)")
         logger.info("迁移 v8 完成")
 
+    # ---- v9: 文章立场投票 ----
+    if current_version < 9:
+        logger.info("数据库迁移 v9: 创建文章立场投票表 (article_poll)")
+        # 说明：文章页的「你怎么看？」投票原先是纯前端 localStorage 假数据，
+        # 刷新/换设备即丢失，且统计时未按文章过滤（在第 5 篇投票，第 100 篇也显示
+        # "已有 1 人参与"）。现在改为真实落库，一人一票、可改票。
+        try:
+            await conn.exec_driver_sql(
+                "CREATE TABLE IF NOT EXISTS article_poll ("
+                "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                "  article_id INTEGER NOT NULL REFERENCES article(id) ON DELETE CASCADE,"
+                "  user_id INTEGER NOT NULL REFERENCES user(id) ON DELETE CASCADE,"
+                "  option TEXT NOT NULL,"
+                "  created_at DATETIME DEFAULT (datetime('now')),"
+                "  updated_at DATETIME,"
+                "  UNIQUE(article_id, user_id)"
+                ")"
+            )
+        except Exception as e:
+            logger.warning(f"迁移 v9 创建 article_poll 失败: {e}")
+        try:
+            await conn.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS idx_poll_article ON article_poll(article_id)"
+            )
+        except Exception as e:
+            logger.warning(f"迁移 v9 创建索引失败: {e}")
+        await conn.exec_driver_sql("INSERT INTO schema_version (version) VALUES (9)")
+        logger.info("迁移 v9 完成")
+
     await conn.commit()
 
 
@@ -381,9 +412,17 @@ async def init_db():
     7. 创建默认用户账号（如果不存在）
     """
     # 导入所有模型，确保 Base.metadata 中包含所有表定义
-    from app.models import article, source, user, feed_log, achievement, ranking, history, favorite, comment  # noqa: F401
-
-    logger = logging.getLogger("fufu.db")
+    from app.models import (  # noqa: F401
+        achievement,
+        article,
+        comment,
+        favorite,
+        feed_log,
+        history,
+        ranking,
+        source,
+        user,
+    )
 
     # 创建所有数据库表
     async with engine.begin() as conn:
@@ -398,7 +437,7 @@ async def init_db():
         await _run_migrations(conn)
 
     # 播种成就数据（如果成就定义表为空）
-    from app.models.achievement import AchievementDef, ACHIEVEMENT_SEEDS
+    from app.models.achievement import ACHIEVEMENT_SEEDS, AchievementDef
     async with async_session() as session:
         from sqlalchemy import select as _select
         ach_result = await session.execute(_select(AchievementDef))
@@ -411,8 +450,9 @@ async def init_db():
     await _seed_default_sources()
 
     # 创建默认用户（如果不存在）
-    from app.models.user import User
     from passlib.context import CryptContext
+
+    from app.models.user import User
     pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
     async with async_session() as session:
@@ -513,10 +553,12 @@ async def _seed_default_sources():
 
     这确保了订阅源列表始终与代码中定义的 STABLE_SOURCES 保持一致。
     """
-    from app.models.source import Source
-    from app.models.article import Article
-    from sqlalchemy import select, delete
     import logging
+
+    from sqlalchemy import delete, select
+
+    from app.models.article import Article
+    from app.models.source import Source
     logger = logging.getLogger("fufu")
 
     async with async_session() as session:
@@ -542,11 +584,14 @@ async def _seed_default_sources():
                 wanted = url_map[s.url]
                 changed = False
                 if s.name != wanted["name"]:
-                    s.name = wanted["name"]; changed = True
+                    s.name = wanted["name"]
+                    changed = True
                 if s.folder != wanted.get("folder", "默认分组"):
-                    s.folder = wanted.get("folder", "默认分组"); changed = True
+                    s.folder = wanted.get("folder", "默认分组")
+                    changed = True
                 if s.source_type != wanted["source_type"]:
-                    s.source_type = wanted["source_type"]; changed = True
+                    s.source_type = wanted["source_type"]
+                    changed = True
                 # 同步策略字段（仅当 STABLE_SOURCES 中明确指定时才更新）
                 for field in ("enrich_content", "use_proxy", "priority"):
                     if field in wanted and getattr(s, field, None) != wanted[field]:
@@ -588,9 +633,10 @@ async def fetch_all_sources():
     import asyncio
     import logging
     logger = logging.getLogger("fufu")
-    from app.models.source import Source
+    from sqlalchemy import delete, select
+
     from app.models.article import Article
-    from sqlalchemy import select, delete
+    from app.models.source import Source
 
     # 获取所有订阅源
     async with async_session() as session:

@@ -18,7 +18,25 @@ fufu新闻 - v1 路由聚合器
 所有路由挂载在 /api/v1 前缀下（由 main.py 中的 app.include_router 设置）。
 """
 from fastapi import APIRouter
-from app.api.v1 import health, auth, sources, articles, ai, opml, achievements, search, rss_proxy, ranking, history, honeypot, folders, comments, recommendations
+
+from app.api.v1 import (
+    achievements,
+    ai,
+    articles,
+    auth,
+    comments,
+    folders,
+    health,
+    history,
+    honeypot,
+    opml,
+    profile,
+    ranking,
+    recommendations,
+    rss_proxy,
+    search,
+    sources,
+)
 
 # 创建 v1 路由聚合器实例
 router = APIRouter()
@@ -39,3 +57,4 @@ router.include_router(honeypot.router, tags=["蜜罐"])  # 蜜罐端点（诱捕
 router.include_router(folders.router, tags=["收藏夹文件夹"])
 router.include_router(recommendations.router, prefix="/recommendations", tags=["个性化推荐"])
 router.include_router(comments.router, tags=["评论"])
+router.include_router(profile.router, prefix="/profile", tags=["画像"])

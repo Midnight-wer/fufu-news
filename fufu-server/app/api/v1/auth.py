@@ -7,10 +7,11 @@ fufu新闻 - 认证接口
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.database import get_db
-from app.core.security import verify_password, create_access_token
+from app.core.security import create_access_token, verify_password
 from app.models.user import User
 
 # 创建认证路由实例

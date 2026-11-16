@@ -8,7 +8,7 @@
 
 /* ----- 初音未来 (Miku) — 默认主题 ----- */
 :root,
-[data-theme="miku"] {
+[data-theme='miku'] {
   /* 颜色 */
   --fufu-teal: 0, 229, 255;
   --fufu-teal-light: 77, 240, 255;
@@ -48,16 +48,16 @@
   --fufu-radius-toast: 20px;
   --fufu-radius-bubble: 18px;
   /* 阴影 (Miku: 青绿光晕) */
-  --fufu-shadow: 0 4px 20px rgba(0,229,255,0.06), 0 1px 4px rgba(57,197,187,0.04);
-  --fufu-shadow-hover: 0 8px 30px rgba(0,229,255,0.12), 0 2px 8px rgba(57,197,187,0.06);
-  --fufu-shadow-float: 0 12px 40px rgba(0,229,255,0.08);
-  --fufu-shadow-glow: 0 0 24px rgba(0,229,255,0.22);
-  --fufu-shadow-card-hover: 0 8px 32px rgba(0,229,255,0.16), 0 2px 8px rgba(197,168,225,0.08);
-  --fufu-shadow-teal: 0 4px 20px rgba(57,197,187,0.1), 0 0 12px rgba(0,229,255,0.06);
+  --fufu-shadow: 0 4px 20px rgba(0, 229, 255, 0.06), 0 1px 4px rgba(57, 197, 187, 0.04);
+  --fufu-shadow-hover: 0 8px 30px rgba(0, 229, 255, 0.12), 0 2px 8px rgba(57, 197, 187, 0.06);
+  --fufu-shadow-float: 0 12px 40px rgba(0, 229, 255, 0.08);
+  --fufu-shadow-glow: 0 0 24px rgba(0, 229, 255, 0.22);
+  --fufu-shadow-card-hover: 0 8px 32px rgba(0, 229, 255, 0.16), 0 2px 8px rgba(197, 168, 225, 0.08);
+  --fufu-shadow-teal: 0 4px 20px rgba(57, 197, 187, 0.1), 0 0 12px rgba(0, 229, 255, 0.06);
 }
 
 /* ----- 温柔奶咖 (Milk Tea) — 暖棕主题 ----- */
-[data-theme="milktea"] {
+[data-theme='milktea'] {
   /* 颜色: 主色 = 奶咖棕 */
   --fufu-teal: 196, 167, 125;
   --fufu-teal-light: 212, 196, 168;
@@ -102,16 +102,16 @@
   --fufu-radius-toast: 10px;
   --fufu-radius-bubble: 10px;
   /* 阴影: 更柔和的暖调投影 */
-  --fufu-shadow: 0 2px 12px rgba(61,53,48,0.06), 0 1px 3px rgba(61,53,48,0.03);
-  --fufu-shadow-hover: 0 4px 20px rgba(61,53,48,0.10), 0 2px 6px rgba(61,53,48,0.04);
-  --fufu-shadow-float: 0 6px 24px rgba(61,53,48,0.06);
-  --fufu-shadow-glow: 0 0 16px rgba(196,167,125,0.18);
-  --fufu-shadow-card-hover: 0 6px 24px rgba(61,53,48,0.12), 0 2px 6px rgba(61,53,48,0.05);
-  --fufu-shadow-teal: 0 2px 12px rgba(157,130,94,0.1), 0 0 8px rgba(196,167,125,0.06);
+  --fufu-shadow: 0 2px 12px rgba(61, 53, 48, 0.06), 0 1px 3px rgba(61, 53, 48, 0.03);
+  --fufu-shadow-hover: 0 4px 20px rgba(61, 53, 48, 0.1), 0 2px 6px rgba(61, 53, 48, 0.04);
+  --fufu-shadow-float: 0 6px 24px rgba(61, 53, 48, 0.06);
+  --fufu-shadow-glow: 0 0 16px rgba(196, 167, 125, 0.18);
+  --fufu-shadow-card-hover: 0 6px 24px rgba(61, 53, 48, 0.12), 0 2px 6px rgba(61, 53, 48, 0.05);
+  --fufu-shadow-teal: 0 2px 12px rgba(157, 130, 94, 0.1), 0 0 8px rgba(196, 167, 125, 0.06);
 }
 
 /* ----- 深色模式 (Dark) ----- */
-[data-theme="dark"],
+[data-theme='dark'],
 html.dark {
   --fufu-teal: 0, 200, 220;
   --fufu-teal-light: 60, 190, 210;
@@ -149,21 +149,47 @@ html.dark {
   --fufu-radius-modal: 24px;
   --fufu-radius-toast: 20px;
   --fufu-radius-bubble: 18px;
-  --fufu-shadow: 0 4px 20px rgba(0,0,0,0.3), 0 1px 4px rgba(0,0,0,0.15);
-  --fufu-shadow-hover: 0 8px 30px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.2);
-  --fufu-shadow-float: 0 12px 40px rgba(0,0,0,0.35);
-  --fufu-shadow-glow: 0 0 24px rgba(0,200,220,0.22);
-  --fufu-shadow-card-hover: 0 8px 32px rgba(0,0,0,0.4), 0 2px 8px rgba(0,200,220,0.08);
-  --fufu-shadow-teal: 0 4px 20px rgba(0,0,0,0.2), 0 0 12px rgba(0,200,220,0.06);
+  --fufu-shadow: 0 4px 20px rgba(0, 0, 0, 0.3), 0 1px 4px rgba(0, 0, 0, 0.15);
+  --fufu-shadow-hover: 0 8px 30px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2);
+  --fufu-shadow-float: 0 12px 40px rgba(0, 0, 0, 0.35);
+  --fufu-shadow-glow: 0 0 24px rgba(0, 200, 220, 0.22);
+  --fufu-shadow-card-hover: 0 8px 32px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 200, 220, 0.08);
+  --fufu-shadow-teal: 0 4px 20px rgba(0, 0, 0, 0.2), 0 0 12px rgba(0, 200, 220, 0.06);
 }
 
 @layer base {
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
 
-  html { transition: background-color 0.4s ease, color 0.4s ease; }
+  html {
+    transition:
+      background-color 0.4s ease,
+      color 0.4s ease;
+  }
 
-  html *, html *::before, html *::after {
-    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.2s ease, box-shadow 0.3s ease;
+  /*
+   * 主题切换过渡 —— 只作用在真正会变色的容器/组件上。
+   * 之前写成 `html *`，等于给页面上每一个节点（含 framer-motion 每帧改写的节点）
+   * 都挂了 4 条 transition：切主题时整页重绘、hover 时元素"慢半拍"、
+   * 滚动时掉帧。这是"UI 看着发飘/卡顿"的主要来源之一。
+   */
+  body,
+  aside,
+  nav,
+  .fufu-card,
+  .glass-card,
+  .fufu-btn,
+  .fufu-input,
+  .fufu-tag,
+  .sidebar-miku {
+    transition:
+      background-color 0.3s ease,
+      border-color 0.3s ease,
+      color 0.2s ease,
+      box-shadow 0.3s ease;
   }
 
   body {
@@ -178,108 +204,260 @@ html.dark {
 
   /* ===== 初音未来 多层背景 (miku + default) ===== */
   :root body::before,
-  [data-theme="miku"] body::before {
+  [data-theme='miku'] body::before {
     content: '';
-    position: fixed; inset: 0; z-index: -10; pointer-events: none;
+    position: fixed;
+    inset: 0;
+    z-index: -10;
+    pointer-events: none;
     background:
       /* 科技网格线 */
-      repeating-linear-gradient(0deg, transparent, transparent 49px, rgba(var(--fufu-teal), 0.025) 49px, rgba(var(--fufu-teal), 0.025) 50px),
-      repeating-linear-gradient(90deg, transparent, transparent 49px, rgba(var(--fufu-teal), 0.025) 49px, rgba(var(--fufu-teal), 0.025) 50px),
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 49px,
+        rgba(var(--fufu-teal), 0.025) 49px,
+        rgba(var(--fufu-teal), 0.025) 50px
+      ),
+      repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 49px,
+        rgba(var(--fufu-teal), 0.025) 49px,
+        rgba(var(--fufu-teal), 0.025) 50px
+      ),
       /* 柔和主渐变 */
-      linear-gradient(160deg, rgb(var(--fufu-cream-soft)) 0%, rgb(var(--fufu-cream)) 30%, #FFFDFE 55%, #FFF7F9 75%, #FFF0F5 90%, rgb(var(--fufu-cream)) 100%),
+        linear-gradient(
+          160deg,
+          rgb(var(--fufu-cream-soft)) 0%,
+          rgb(var(--fufu-cream)) 30%,
+          #fffdfe 55%,
+          #fff7f9 75%,
+          #fff0f5 90%,
+          rgb(var(--fufu-cream)) 100%
+        ),
       /* 光晕 */
-      radial-gradient(ellipse at 80% 10%, rgba(var(--fufu-teal), 0.07) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 10%, rgba(var(--fufu-teal), 0.07) 0%, transparent 50%),
       radial-gradient(ellipse at 15% 80%, rgba(var(--fufu-pink), 0.06) 0%, transparent 50%),
       radial-gradient(ellipse at 55% 45%, rgba(var(--fufu-teal-deep), 0.03) 0%, transparent 55%);
   }
 
   /* 音频波形背景装饰 (miku) */
   :root body::after,
-  [data-theme="miku"] body::after {
+  [data-theme='miku'] body::after {
     content: '';
-    position: fixed; inset: 0; z-index: -9; pointer-events: none; opacity: 0.03;
-    background:
-      repeating-linear-gradient(0deg, transparent, transparent 28px, rgb(var(--fufu-teal)) 28px, rgb(var(--fufu-teal)) 30px, transparent 30px, transparent 58px),
-      repeating-linear-gradient(0deg, transparent, transparent 12px, rgb(var(--fufu-pink)) 12px, rgb(var(--fufu-pink)) 14px, transparent 14px, transparent 38px);
-    mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.5) 15%, rgba(0,0,0,0.5) 85%, transparent 100%);
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.5) 15%, rgba(0,0,0,0.5) 85%, transparent 100%);
+    position: fixed;
+    inset: 0;
+    z-index: -9;
+    pointer-events: none;
+    opacity: 0.03;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 28px,
+        rgb(var(--fufu-teal)) 28px,
+        rgb(var(--fufu-teal)) 30px,
+        transparent 30px,
+        transparent 58px
+      ),
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 12px,
+        rgb(var(--fufu-pink)) 12px,
+        rgb(var(--fufu-pink)) 14px,
+        transparent 14px,
+        transparent 38px
+      );
+    mask-image: linear-gradient(
+      to bottom,
+      transparent 0%,
+      rgba(0, 0, 0, 0.5) 15%,
+      rgba(0, 0, 0, 0.5) 85%,
+      transparent 100%
+    );
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      transparent 0%,
+      rgba(0, 0, 0, 0.5) 15%,
+      rgba(0, 0, 0, 0.5) 85%,
+      transparent 100%
+    );
   }
 
   /* ===== 温柔奶咖 背景 (milktea) ===== */
-  [data-theme="milktea"] body::before {
+  [data-theme='milktea'] body::before {
     content: '';
-    position: fixed; inset: 0; z-index: -10; pointer-events: none;
+    position: fixed;
+    inset: 0;
+    z-index: -10;
+    pointer-events: none;
     background:
       /* 温暖渐变 */
-      linear-gradient(160deg, rgb(var(--fufu-cream-soft)) 0%, rgb(var(--fufu-cream)) 30%, #FFFCF9 50%, #FFF8F6 70%, rgb(var(--fufu-cream)) 100%),
+      linear-gradient(
+        160deg,
+        rgb(var(--fufu-cream-soft)) 0%,
+        rgb(var(--fufu-cream)) 30%,
+        #fffcf9 50%,
+        #fff8f6 70%,
+        rgb(var(--fufu-cream)) 100%
+      ),
       /* 暖调光晕 */
-      radial-gradient(ellipse at 80% 10%, rgba(var(--fufu-teal), 0.04) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 10%, rgba(var(--fufu-teal), 0.04) 0%, transparent 50%),
       radial-gradient(ellipse at 15% 80%, rgba(var(--fufu-pink), 0.04) 0%, transparent 50%);
   }
 
   /* 奶咖主题隐藏音频波形 */
-  [data-theme="milktea"] body::after { display: none; }
+  [data-theme='milktea'] body::after {
+    display: none;
+  }
 
   /* ===== 暗黑模式背景 ===== */
-  [data-theme="dark"] body::before,
+  [data-theme='dark'] body::before,
   html.dark body::before {
     content: '';
-    position: fixed; inset: 0; z-index: -10; pointer-events: none;
-    background:
-      repeating-linear-gradient(0deg, transparent, transparent 49px, rgba(var(--fufu-teal), 0.02) 49px, rgba(var(--fufu-teal), 0.02) 50px),
-      repeating-linear-gradient(90deg, transparent, transparent 49px, rgba(var(--fufu-teal), 0.02) 49px, rgba(var(--fufu-teal), 0.02) 50px),
-      linear-gradient(160deg, #1A1C2E 0%, #1E2040 40%, #221E32 70%, #1A1C2E 100%),
+    position: fixed;
+    inset: 0;
+    z-index: -10;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 49px,
+        rgba(var(--fufu-teal), 0.02) 49px,
+        rgba(var(--fufu-teal), 0.02) 50px
+      ),
+      repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 49px,
+        rgba(var(--fufu-teal), 0.02) 49px,
+        rgba(var(--fufu-teal), 0.02) 50px
+      ),
+      linear-gradient(160deg, #1a1c2e 0%, #1e2040 40%, #221e32 70%, #1a1c2e 100%),
       radial-gradient(ellipse at 80% 10%, rgba(var(--fufu-teal), 0.04) 0%, transparent 55%),
       radial-gradient(ellipse at 15% 80%, rgba(var(--fufu-pink), 0.03) 0%, transparent 55%);
   }
-  [data-theme="dark"] body::after,
-  html.dark body::after { opacity: 0.02; }
+  [data-theme='dark'] body::after,
+  html.dark body::after {
+    opacity: 0.02;
+  }
 
   /* ===== 暗黑模式组件覆盖 ===== */
-  [data-theme="dark"] .glass-card,
-  html.dark .glass-card { background: rgba(30,32,58,0.85); border-color: rgba(var(--fufu-teal), 0.1); }
+  [data-theme='dark'] .glass-card,
+  html.dark .glass-card {
+    background: rgba(30, 32, 58, 0.85);
+    border-color: rgba(var(--fufu-teal), 0.1);
+  }
 
-  [data-theme="dark"] .fufu-card:hover,
-  html.dark .fufu-card:hover { box-shadow: 0 8px 32px rgba(var(--fufu-teal), 0.1); }
+  [data-theme='dark'] .fufu-card:hover,
+  html.dark .fufu-card:hover {
+    box-shadow: 0 8px 32px rgba(var(--fufu-teal), 0.1);
+  }
 
-  [data-theme="dark"] .fufu-input,
-  html.dark .fufu-input { background: #2C2E48; color: rgb(var(--fufu-text)); border-color: #3E4060; }
-  [data-theme="dark"] .fufu-input:focus,
-  html.dark .fufu-input:focus { border-color: rgb(var(--fufu-teal)); background: #2C2E48; }
+  [data-theme='dark'] .fufu-input,
+  html.dark .fufu-input {
+    background: #2c2e48;
+    color: rgb(var(--fufu-text));
+    border-color: #3e4060;
+  }
+  [data-theme='dark'] .fufu-input:focus,
+  html.dark .fufu-input:focus {
+    border-color: rgb(var(--fufu-teal));
+    background: #2c2e48;
+  }
 
-  [data-theme="dark"] .fufu-btn.bg-fufu-cream,
+  [data-theme='dark'] .fufu-btn.bg-fufu-cream,
   html.dark .fufu-btn.bg-fufu-cream,
-  [data-theme="dark"] .fufu-btn.bg-fufu-white,
+  [data-theme='dark'] .fufu-btn.bg-fufu-white,
   html.dark .fufu-btn.bg-fufu-white,
-  [data-theme="dark"] .fufu-btn.bg-white,
-  html.dark .fufu-btn.bg-white { background: #242640; color: #B8C0D0; }
+  [data-theme='dark'] .fufu-btn.bg-white,
+  html.dark .fufu-btn.bg-white {
+    background: #242640;
+    color: #b8c0d0;
+  }
 
-  [data-theme="dark"] .skeleton,
-  html.dark .skeleton { background: linear-gradient(90deg, #242640 25%, #323458 50%, #242640 75%); background-size: 200% 100%; }
+  [data-theme='dark'] .skeleton,
+  html.dark .skeleton {
+    background: linear-gradient(90deg, #242640 25%, #323458 50%, #242640 75%);
+    background-size: 200% 100%;
+  }
 
   /* ===== 字体大小 ===== */
-  html[data-font-size="small"] { font-size: 14px; }
-  html[data-font-size="medium"] { font-size: 16px; }
-  html[data-font-size="large"] { font-size: 18px; }
+  html[data-font-size='small'] {
+    font-size: 14px;
+  }
+  html[data-font-size='medium'] {
+    font-size: 16px;
+  }
+  html[data-font-size='large'] {
+    font-size: 18px;
+  }
 
   /* ===== 滚动条 ===== */
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: rgba(var(--fufu-teal-light), 0.6); border-radius: 20px; }
-  ::-webkit-scrollbar-thumb:hover { background: rgb(var(--fufu-teal)); }
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(var(--fufu-teal-light), 0.6);
+    border-radius: 20px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--fufu-teal));
+  }
+  /* Firefox 之前完全没定义，滚动条是系统默认粗条，和整体画风不一致 */
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(var(--fufu-teal-light), 0.6) transparent;
+  }
 
   /* ===== 选中文本 ===== */
-  ::selection { background: rgba(var(--fufu-teal), 0.16); color: rgb(var(--fufu-text)); }
+  ::selection {
+    background: rgba(var(--fufu-teal), 0.16);
+    color: rgb(var(--fufu-text));
+  }
 
   /* ===== 焦点框 ===== */
-  *:focus-visible { outline: 2px solid rgb(var(--fufu-teal)); outline-offset: 2px; border-radius: 4px; }
+  *:focus-visible {
+    outline: 2px solid rgb(var(--fufu-teal));
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* ===== 图片 / 媒体的默认排版 ===== */
+  img,
+  svg,
+  video {
+    max-width: 100%;
+  }
+  img {
+    height: auto;
+  }
+
+  /* ===== 无障碍：尊重系统的"减少动态效果"设置 ===== */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
 @layer components {
   /* ===== 玻璃卡片 ===== */
   .glass-card {
-    background: rgba(var(--fufu-white), 0.72); backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px); border: 1px solid rgba(var(--fufu-teal), 0.14);
+    background: rgba(var(--fufu-white), 0.72);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(var(--fufu-teal), 0.14);
   }
 
   /* ===== 基础卡片 ===== */
@@ -289,17 +467,32 @@ html.dark {
     box-shadow: var(--fufu-shadow);
     transition: all 0.3s ease;
   }
-  .fufu-card:hover { box-shadow: var(--fufu-shadow-card-hover); transform: translateY(-2px); }
+  /*
+   * 注意：这里之前带 transform: translateY(-2px)，于是**所有** .fufu-card
+   * （包括文章正文容器、设置面板这种不该动的静态卡片）鼠标一扫就会往上跳一下，
+   * 阅读时非常干扰。位移只保留给真正可点击的 .news-card-hover。
+   */
+  .fufu-card:hover {
+    box-shadow: var(--fufu-shadow-card-hover);
+  }
 
   /* ===== 按钮 ===== */
-  .fufu-btn { @apply px-6 py-3 font-cute text-base transition-all duration-200 active:scale-[0.96] select-none cursor-pointer outline-none; border-radius: var(--fufu-radius-btn); }
+  .fufu-btn {
+    @apply px-6 py-3 font-cute text-base transition-all duration-200 active:scale-[0.96] select-none cursor-pointer outline-none;
+    border-radius: var(--fufu-radius-btn);
+  }
   .fufu-btn-primary {
     @apply fufu-btn text-white;
     background: linear-gradient(135deg, rgb(var(--fufu-teal)), rgb(var(--fufu-teal-deep)));
     box-shadow: 0 4px 16px rgba(var(--fufu-teal), 0.25);
   }
-  .fufu-btn-primary:hover { box-shadow: 0 6px 24px rgba(var(--fufu-teal), 0.38); transform: translateY(-1px); }
-  .fufu-btn-primary:active { transform: scale(0.96); }
+  .fufu-btn-primary:hover {
+    box-shadow: 0 6px 24px rgba(var(--fufu-teal), 0.38);
+    transform: translateY(-1px);
+  }
+  .fufu-btn-primary:active {
+    transform: scale(0.96);
+  }
 
   .fufu-btn-mint {
     @apply fufu-btn text-white;
@@ -314,12 +507,18 @@ html.dark {
     background: rgb(var(--fufu-white));
     color: rgb(var(--fufu-text));
   }
-  .fufu-input::placeholder { color: rgb(var(--fufu-text-light)); }
+  .fufu-input::placeholder {
+    color: rgb(var(--fufu-text-light));
+  }
   .fufu-input:focus {
     border-color: rgb(var(--fufu-teal));
-    box-shadow: 0 0 0 4px rgba(var(--fufu-teal), 0.1), 0 0 16px rgba(var(--fufu-teal), 0.06);
+    box-shadow:
+      0 0 0 4px rgba(var(--fufu-teal), 0.1),
+      0 0 16px rgba(var(--fufu-teal), 0.06);
   }
-  .fufu-input:hover { border-color: rgba(var(--fufu-teal), 0.25); }
+  .fufu-input:hover {
+    border-color: rgba(var(--fufu-teal), 0.25);
+  }
 
   /* ===== 标签 ===== */
   .fufu-tag {
@@ -329,126 +528,263 @@ html.dark {
 
   /* ===== 骨架屏 ===== */
   .skeleton {
-    background: linear-gradient(90deg, rgb(var(--fufu-highlight)) 25%, rgba(var(--fufu-teal-soft), 0.6) 50%, rgb(var(--fufu-highlight)) 75%);
+    background: linear-gradient(
+      90deg,
+      rgb(var(--fufu-highlight)) 25%,
+      rgba(var(--fufu-teal-soft), 0.6) 50%,
+      rgb(var(--fufu-highlight)) 75%
+    );
     background-size: 200% 100%;
     animation: shimmer 1.5s infinite;
   }
-  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  @keyframes shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
 
   /* ===== 动画 ===== */
-  .modal-enter { animation: bounceIn 0.35s ease-out; }
-  @keyframes bounceIn { 0% { transform: scale(0.9); opacity: 0; } 50% { transform: scale(1.03); } 100% { transform: scale(1); opacity: 1; } }
+  .modal-enter {
+    animation: bounceIn 0.35s ease-out;
+  }
+  @keyframes bounceIn {
+    0% {
+      transform: scale(0.9);
+      opacity: 0;
+    }
+    50% {
+      transform: scale(1.03);
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
 
-  .page-enter { opacity: 0; transform: translateY(12px); }
-  .page-enter-active { opacity: 1; transform: translateY(0); transition: opacity 0.3s ease, transform 0.3s ease; }
-  .page-exit { opacity: 1; }
-  .page-exit-active { opacity: 0; transform: translateY(-8px); transition: opacity 0.2s ease, transform 0.2s ease; }
+  .page-enter {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  .page-enter-active {
+    opacity: 1;
+    transform: translateY(0);
+    transition:
+      opacity 0.3s ease,
+      transform 0.3s ease;
+  }
+  .page-exit {
+    opacity: 1;
+  }
+  .page-exit-active {
+    opacity: 0;
+    transform: translateY(-8px);
+    transition:
+      opacity 0.2s ease,
+      transform 0.2s ease;
+  }
 
   /* ===== 新闻卡片悬停 ===== */
-  .news-card-hover { transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.25s ease; }
+  .news-card-hover {
+    transition:
+      transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+      box-shadow 0.25s ease;
+  }
   .news-card-hover:hover {
     transform: translateY(-4px) scale(1.02);
-    box-shadow: 0 8px 32px rgba(var(--fufu-teal), 0.16), 0 2px 8px rgba(var(--fufu-lavender), 0.08);
+    box-shadow:
+      0 8px 32px rgba(var(--fufu-teal), 0.16),
+      0 2px 8px rgba(var(--fufu-lavender), 0.08);
+  }
+  /* 开了"减少动效"就不要位移了，只留阴影提示可点 */
+  @media (prefers-reduced-motion: reduce) {
+    .news-card-hover:hover,
+    .fufu-card:hover {
+      transform: none;
+    }
   }
 
   /* ===== 搜索高亮 ===== */
-  .search-highlight { background: linear-gradient(180deg, transparent 60%, rgb(var(--fufu-teal-soft)) 60%); padding: 0 2px; border-radius: 2px; }
+  .search-highlight {
+    background: linear-gradient(180deg, transparent 60%, rgb(var(--fufu-teal-soft)) 60%);
+    padding: 0 2px;
+    border-radius: 2px;
+  }
 
   /* ===== 初音额外组件样式 ===== */
 
   /* 发光边框 */
   .miku-glow-border {
     border: 1px solid rgba(var(--fufu-teal), 0.25);
-    box-shadow: 0 0 12px rgba(var(--fufu-teal), 0.08), inset 0 0 8px rgba(var(--fufu-teal), 0.03);
+    box-shadow:
+      0 0 12px rgba(var(--fufu-teal), 0.08),
+      inset 0 0 8px rgba(var(--fufu-teal), 0.03);
   }
   .miku-glow-border:hover {
     border-color: rgba(var(--fufu-teal), 0.45);
-    box-shadow: 0 0 20px rgba(var(--fufu-teal), 0.18), inset 0 0 12px rgba(var(--fufu-teal), 0.05);
+    box-shadow:
+      0 0 20px rgba(var(--fufu-teal), 0.18),
+      inset 0 0 12px rgba(var(--fufu-teal), 0.05);
   }
 
   /* 渐变文字 */
   .miku-gradient-text {
-    background: linear-gradient(135deg, rgb(var(--fufu-teal)), rgb(var(--fufu-teal-deep)), rgb(var(--fufu-pink)));
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    background: linear-gradient(
+      135deg,
+      rgb(var(--fufu-teal)),
+      rgb(var(--fufu-teal-deep)),
+      rgb(var(--fufu-pink))
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
   /* 卡片顶部装饰条 */
-  .miku-accent-bar { position: relative; }
+  .miku-accent-bar {
+    position: relative;
+  }
   .miku-accent-bar::before {
-    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
     border-radius: var(--fufu-radius-card) var(--fufu-radius-card) 0 0;
-    background: linear-gradient(90deg, rgb(var(--fufu-teal)), rgb(var(--fufu-teal-deep)), rgb(var(--fufu-pink)));
+    background: linear-gradient(
+      90deg,
+      rgb(var(--fufu-teal)),
+      rgb(var(--fufu-teal-deep)),
+      rgb(var(--fufu-pink))
+    );
     opacity: 0.65;
   }
 
   /* 音符装饰动画 */
-  .music-note { display: inline-block; animation: musicFloat 4s ease-in-out infinite; opacity: 0.25; pointer-events: none; }
-  .music-note:nth-child(odd) { animation-delay: 0.6s; }
-  .music-note:nth-child(3n) { animation-delay: 1.3s; }
+  .music-note {
+    display: inline-block;
+    animation: musicFloat 4s ease-in-out infinite;
+    opacity: 0.25;
+    pointer-events: none;
+  }
+  .music-note:nth-child(odd) {
+    animation-delay: 0.6s;
+  }
+  .music-note:nth-child(3n) {
+    animation-delay: 1.3s;
+  }
 
   /* 青绿波纹点击反馈 */
-  .miku-ripple { position: relative; overflow: hidden; }
-  .miku-ripple::after {
-    content: ''; position: absolute; inset: 0;
-    background: radial-gradient(circle at center, rgba(var(--fufu-teal), 0.18) 0%, transparent 70%);
-    opacity: 0; transition: opacity 0.4s;
+  .miku-ripple {
+    position: relative;
+    overflow: hidden;
   }
-  .miku-ripple:active::after { opacity: 1; transition: opacity 0s; }
+  .miku-ripple::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, rgba(var(--fufu-teal), 0.18) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+  .miku-ripple:active::after {
+    opacity: 1;
+    transition: opacity 0s;
+  }
 
   /* 侧边栏分层背景 */
   .sidebar-miku {
-    background: linear-gradient(180deg, rgba(var(--fufu-cream-soft), 0.95) 0%, rgba(var(--fufu-cream), 0.85) 40%, rgba(var(--fufu-pink-soft), 0.8) 100%);
+    background: linear-gradient(
+      180deg,
+      rgba(var(--fufu-cream-soft), 0.95) 0%,
+      rgba(var(--fufu-cream), 0.85) 40%,
+      rgba(var(--fufu-pink-soft), 0.8) 100%
+    );
     border-right: 1px solid rgba(var(--fufu-teal), 0.1);
   }
 
   /* 卡片渐变背景 */
   .miku-card-gradient {
-    background: linear-gradient(135deg, rgba(var(--fufu-white), 0.9), rgba(var(--fufu-cream-soft), 0.85), rgba(var(--fufu-pink-soft), 0.9));
+    background: linear-gradient(
+      135deg,
+      rgba(var(--fufu-white), 0.9),
+      rgba(var(--fufu-cream-soft), 0.85),
+      rgba(var(--fufu-pink-soft), 0.9)
+    );
     border: 1px solid rgba(var(--fufu-teal), 0.1);
   }
 
   /* 文字阴影 */
-  .miku-text-shadow { text-shadow: 0 0 8px rgba(var(--fufu-teal), 0.25); }
+  .miku-text-shadow {
+    text-shadow: 0 0 8px rgba(var(--fufu-teal), 0.25);
+  }
 }
 
 /* ===== 奶咖主题特殊组件覆盖 ===== */
-[data-theme="milktea"] .sidebar-miku {
-  background: linear-gradient(180deg, rgba(var(--fufu-cream), 0.95) 0%, rgba(var(--fufu-white), 0.88) 50%, rgba(var(--fufu-cream-soft), 0.82) 100%);
+[data-theme='milktea'] .sidebar-miku {
+  background: linear-gradient(
+    180deg,
+    rgba(var(--fufu-cream), 0.95) 0%,
+    rgba(var(--fufu-white), 0.88) 50%,
+    rgba(var(--fufu-cream-soft), 0.82) 100%
+  );
   border-right: 1px solid rgba(var(--fufu-teal), 0.12);
 }
 
 /* 奶咖主题卡片鼠标悬停效果更柔和 */
-[data-theme="milktea"] .fufu-card:hover {
+[data-theme='milktea'] .fufu-card:hover {
   transform: translateY(-1px);
 }
 
-[data-theme="milktea"] .news-card-hover:hover {
+[data-theme='milktea'] .news-card-hover:hover {
   transform: translateY(-2px) scale(1.01);
 }
 
 /* 奶咖主题按钮圆角更小 */
-[data-theme="milktea"] .fufu-btn-primary {
+[data-theme='milktea'] .fufu-btn-primary {
   box-shadow: 0 2px 10px rgba(var(--fufu-teal), 0.2);
 }
-[data-theme="milktea"] .fufu-btn-primary:hover {
+[data-theme='milktea'] .fufu-btn-primary:hover {
   box-shadow: 0 4px 16px rgba(var(--fufu-teal), 0.3);
 }
 
 /* 奶咖主题渐变调暖 */
-[data-theme="milktea"] .miku-gradient-text {
-  background: linear-gradient(135deg, rgb(var(--fufu-teal)), rgb(var(--fufu-teal-deep)), rgb(var(--fufu-pink-soft)));
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+[data-theme='milktea'] .miku-gradient-text {
+  background: linear-gradient(
+    135deg,
+    rgb(var(--fufu-teal)),
+    rgb(var(--fufu-teal-deep)),
+    rgb(var(--fufu-pink-soft))
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 /* ===== 全局动画 ===== */
 @keyframes musicFloat {
-  0%, 100% { transform: translateY(0px) rotate(0deg); }
-  33% { transform: translateY(-10px) rotate(5deg); }
-  66% { transform: translateY(-4px) rotate(-3deg); }
+  0%,
+  100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  33% {
+    transform: translateY(-10px) rotate(5deg);
+  }
+  66% {
+    transform: translateY(-4px) rotate(-3deg);
+  }
 }
 @keyframes glowPulse {
-  0%, 100% { box-shadow: 0 0 8px rgba(var(--fufu-teal), 0.3); }
-  50% { box-shadow: 0 0 20px rgba(var(--fufu-teal), 0.6); }
+  0%,
+  100% {
+    box-shadow: 0 0 8px rgba(var(--fufu-teal), 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(var(--fufu-teal), 0.6);
+  }
 }
 
 /* ================================================================
@@ -480,10 +816,10 @@ html.dark {
 /* 移动端粘性操作栏（文章页底部） */
 .mobile-sticky-actions {
   position: fixed;
-  bottom: 0;
+  bottom: 4.5rem;
   left: 0;
   right: 0;
-  z-index: 45;
+  z-index: 60;
   background: rgba(255, 255, 255, 0.88);
   backdrop-filter: blur(16px) saturate(180%);
   -webkit-backdrop-filter: blur(16px) saturate(180%);

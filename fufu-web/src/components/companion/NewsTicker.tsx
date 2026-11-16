@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import client from '../../api/client';
+import { fetchArticles } from '../../api/articles';
 
 const GREETINGS = [
   'こんにちは～来听听今天的新闻吧！🎶',
@@ -41,10 +41,13 @@ export default function NewsTicker() {
   const { data } = useQuery<{ articles: Article[] }>({
     queryKey: ['news-ticker'],
     queryFn: async () => {
-      const { data: res } = await client.get('/articles', {
-        params: { page: 1, page_size: 20, sort: 'latest', since: '3d' },
+      const res = await fetchArticles<{ articles: Article[] }>({
+        page: 1,
+        page_size: 20,
+        sort: 'latest',
+        since: '3d',
       });
-      return res;
+      return res ?? { articles: [] };
     },
     refetchInterval: 180_000, // 每3分钟刷新一次
     staleTime: 120_000,
@@ -83,7 +86,12 @@ export default function NewsTicker() {
 
   return (
     <motion.div
-      className="fixed left-6 bottom-20 z-40 select-none max-w-[260px]"
+      /*
+       * 移动端隐藏：这里 fixed 在左下、看板娘 fixed 在右下，
+       * 375px 宽的屏幕上两者的横向区间会重叠，气泡互相压字。
+       * 小屏本来也不需要这条悬浮播报，交给底部导航栏就够了。
+       */
+      className="hidden md:block fixed left-6 bottom-6 z-40 select-none max-w-[260px]"
       initial={{ opacity: 0, y: 30, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ delay: 1.2, duration: 0.5, ease: 'easeOut' }}
@@ -98,7 +106,8 @@ export default function NewsTicker() {
         {/* 气泡主体 */}
         <div className="relative bg-white/92 backdrop-blur-md border-2 border-fufu-teal-soft/40 rounded-2xl rounded-bl-md px-4 py-3 shadow-lg shadow-fufu-teal/8">
           {/* 小尾巴 */}
-          <div className="absolute -left-[10px] bottom-3 w-0 h-0
+          <div
+            className="absolute -left-[10px] bottom-3 w-0 h-0
             border-t-[10px] border-t-transparent
             border-r-[14px] border-r-white/92
             border-b-[10px] border-b-transparent

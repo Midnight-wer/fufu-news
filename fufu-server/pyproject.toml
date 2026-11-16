@@ -1,0 +1,57 @@
+[tool.ruff]
+# 与项目实际运行版本一致（Dockerfile / 本地均为 3.10）
+target-version = "py310"
+line-length = 100
+exclude = [
+    ".git",
+    "__pycache__",
+    "venv",
+    ".venv",
+    "data",
+    "logs",
+]
+
+[tool.ruff.lint]
+# 先开一组低噪音、高价值的规则；不上 ALL，避免一次性几千条告警淹没人
+select = [
+    "E",    # pycodestyle 错误（缩进/空白/行长）
+    "F",    # pyflakes：未定义名、未使用导入/变量 —— 这类是真 bug 温床
+    "W",    # pycodestyle 警告
+    "I",    # isort：导入顺序
+    "B",    # flake8-bugbear：常见陷阱（可变默认参数等）
+    "UP",   # pyupgrade：旧写法现代化
+    "C4",   # 列表/字典推导简化
+    "SIM",  # 可简化的条件/语句
+]
+ignore = [
+    "E501",   # 行长交给 formatter 处理，中文注释很容易超长
+    "B008",   # FastAPI 的 Depends() 写在默认参数里是标准写法，不是 bug
+    "UP006",  # 3.10 里 list/dict 注解先不强改
+    "UP007",  # Optional → | 同理，改起来面太大
+    "SIM108", # 三元表达式的改写意见比较主观
+
+    # SQLAlchemy 必须用 `== None` / `== True` 才能翻译成 SQL 的 IS NULL / IS TRUE，
+    # 写成 `is None` 会被 Python 直接求值成 bool，查询静默失效。这里是**刻意为之**。
+    "E711",
+    "E712",
+
+    # 迁移脚本 / 启动路径里有大量"延后导入"以避免循环依赖，属于有意为之
+    "E402",
+
+    # `try: ... except: pass` 改 contextlib.suppress 是纯风格问题，
+    # 现有 31 处改动面太大、收益为零，先不折腾
+    "SIM105",
+
+    # 嵌套 if / 嵌套 with 合并是主观可读性取舍：
+    # ai.py 里有两层 async with 各带注释，合并后单行过长反而更难读。
+    "SIM102",
+    "SIM117",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# 迁移脚本里一堆历史 import，先不折腾
+"app/core/database.py" = ["F401", "E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

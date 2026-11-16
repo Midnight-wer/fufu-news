@@ -11,6 +11,7 @@ import ScrollParallax from '../components/effects/ScrollParallax';
 import { useCompanionStore } from '../stores/companionStore';
 import { useCheckAchievement } from '../hooks/useAchievements';
 import { useRecordHit } from '../hooks/useRanking';
+import { useCategories } from '../hooks/useRanking';
 import VirtualArticleList from '../components/common/VirtualArticleList';
 import HotListWidget from '../components/common/HotListWidget';
 import RecommendationWidget from '../components/common/RecommendationWidget';
@@ -27,13 +28,16 @@ const SINCE_OPTIONS = [
   { value: '7d', label: '一周内' },
 ] as const;
 
+/**
+ * 分类只保留一个真源：value 直接就是传给后端的 category。
+ * 之前这里和下面的筛选函数各写了一遍 if 分支，改一个忘另一个是迟早的事。
+ */
 const CATEGORY_OPTIONS = [
-  { value: 'all', label: '🌸 全部', emoji: '🌸' },
+  { value: 'all', label: '全部', emoji: '🌸' },
   { value: '动漫', label: '动漫', emoji: '🎬' },
   { value: '游戏', label: '游戏', emoji: '🎮' },
   { value: '科技', label: '科技', emoji: '💻' },
   { value: '设计', label: '设计', emoji: '🎨' },
-  { value: '科普', label: '科普', emoji: '🌿' },
   { value: '综合', label: '综合', emoji: '📰' },
 ] as const;
 
@@ -48,7 +52,73 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 function getSaved(k: string, d: string): string {
-  try { return localStorage.getItem(k) || d; } catch { return d; }
+  try {
+    return localStorage.getItem(k) || d;
+  } catch {
+    return d;
+  }
+}
+
+const EMPTY_HINT: Record<string, string> = {
+  动漫: '动漫区暂时还没有新闻呢～',
+  游戏: '游戏区暂时空空的～',
+  科技: '科技区等待第一篇投稿～',
+  设计: '设计区还在收集灵感～',
+  综合: '综合区还没有新动态～',
+  all: '还没有新闻哦～',
+};
+
+const EMPTY_EMOJI: Record<string, string> = {
+  动漫: '🎬',
+  游戏: '🎮',
+  科技: '💻',
+  设计: '🎨',
+  综合: '📰',
+  all: '🍃',
+};
+
+/** 分类按钮：移动端和桌面端共用，避免两套样式各写一遍 */
+function CategoryPill({
+  active,
+  emoji,
+  label,
+  count,
+  compact,
+  onClick,
+}: {
+  active: boolean;
+  emoji: string;
+  label: string;
+  count?: number;
+  compact?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`flex-shrink-0 rounded-fufu-tag font-cute text-xs transition-all duration-200 flex items-center gap-1.5 touch-target ${
+        compact ? 'px-3 py-1.5' : 'px-3 py-1.5'
+      } ${
+        active
+          ? 'bg-fufu-teal text-white shadow-sm'
+          : 'bg-white/80 text-fufu-text-light border border-fufu-teal-soft/20 hover:bg-fufu-teal-soft/30'
+      }`}
+    >
+      <span>{emoji}</span>
+      <span>{label}</span>
+      {typeof count === 'number' && count > 0 && (
+        <span
+          className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-body leading-none ${
+            active ? 'bg-white/25 text-white' : 'bg-fufu-teal-soft/30 text-fufu-text-muted'
+          }`}
+        >
+          {count}
+        </span>
+      )}
+    </button>
+  );
 }
 
 export default function HomePage() {
@@ -57,7 +127,16 @@ export default function HomePage() {
   const [since, setSince] = useState<string>(getSaved('fufu-since', 'all'));
   const [category, setCategory] = useState<string>(getSaved('fufu-cat', 'all'));
   const [reshuffle, setReshuffle] = useState(0);
-  const { data, isLoading, isPlaceholderData, error, refetch } = useArticles(page, 20, sort as 'latest' | 'random', since);
+
+  const { data, isLoading, isPlaceholderData, error, refetch } = useArticles(
+    page,
+    20,
+    sort as 'latest' | 'random',
+    since,
+    category,
+  );
+  const { data: categoryCounts } = useCategories();
+
   const showLoading = isLoading || isPlaceholderData;
   const debouncedRefetch = useDebouncedCallback(refetch, 1000);
   const toggleFav = useToggleFavorite();
@@ -69,9 +148,11 @@ export default function HomePage() {
   const articles = data?.articles ?? [];
   const total = data?.total ?? 0;
   const pageSize = data?.page_size ?? 20;
+  const fromCache = data?.fromCache === true;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   // 前端洗牌——当 sort=random 时对已有结果再次随机化
-  const shuffledArticles = useMemo(() => {
+  const displayArticles = useMemo(() => {
     if (sort === 'random' && articles.length > 1) {
       return shuffle(articles);
     }
@@ -85,8 +166,40 @@ export default function HomePage() {
     companion.showMessage('换了一批新闻给你看～🎲');
   }, [companion]);
 
+  const pickCategory = useCallback((value: string) => {
+    setCategory(value);
+    setPage(1);
+    try {
+      localStorage.setItem('fufu-cat', value);
+    } catch {
+      /* 隐私模式下忽略 */
+    }
+  }, []);
+
+  const pickSince = useCallback((value: string) => {
+    setSince(value);
+    setPage(1);
+    try {
+      localStorage.setItem('fufu-since', value);
+    } catch {
+      /* 同上 */
+    }
+  }, []);
+
+  const pickSort = useCallback((value: string) => {
+    setSort(value);
+    setPage(1);
+    try {
+      localStorage.setItem('fufu-sort', value);
+    } catch {
+      /* 同上 */
+    }
+  }, []);
+
   const [heartState, setHeartState] = useState<{ active: boolean; x: number; y: number }>({
-    active: false, x: 0, y: 0,
+    active: false,
+    x: 0,
+    y: 0,
   });
 
   const triggerHeart = (e: MouseEvent, id: number, currentVal: boolean) => {
@@ -100,43 +213,6 @@ export default function HomePage() {
   };
 
   const { ripples, trigger } = useClickRipple();
-
-  // 按分类筛选 — source_folder + tags
-  const filteredArticles = useMemo(() => {
-    if (shuffledArticles.length === 0) return [];
-    if (category === 'all') return shuffledArticles;
-    return shuffledArticles.filter((a) => {
-      const folder = a.source_folder || '';
-      const tags: string[] = (a.tags ?? []).map((t: string) => t.trim());
-      const signals = new Set([folder, ...tags]);
-      if (category === '动漫') return signals.has('动漫');
-      if (category === '游戏') return signals.has('游戏');
-      if (category === '科技') return signals.has('科技');
-      if (category === '设计') return signals.has('设计');
-      if (category === '综合') return signals.has('综合') || signals.has('文化') || signals.has('趣味') || signals.has('娱乐') || signals.has('科普');
-      return false;
-    });
-  }, [shuffledArticles, category]);
-
-  // 每个分类的文章数量
-  const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: articles.length };
-    for (const c of CATEGORY_OPTIONS) {
-      if (c.value === 'all') continue;
-      counts[c.value] = articles.filter((a) => {
-        const folder = a.source_folder || '';
-        const tags: string[] = (a.tags ?? []).map((t: string) => t.trim());
-        const signals = new Set([folder, ...tags]);
-        if (c.value === '动漫') return signals.has('动漫');
-        if (c.value === '游戏') return signals.has('游戏');
-        if (c.value === '科技') return signals.has('科技');
-        if (c.value === '设计') return signals.has('设计');
-        if (c.value === '综合') return signals.has('综合') || signals.has('文化') || signals.has('趣味') || signals.has('娱乐') || signals.has('科普');
-        return false;
-      }).length;
-    }
-    return counts;
-  }, [articles]);
 
   return (
     <div>
@@ -154,59 +230,33 @@ export default function HomePage() {
         <div className="md:hidden filter-scroll mb-2">
           <div className="flex gap-1.5 px-1 py-2">
             {CATEGORY_OPTIONS.map((c) => (
-              <button
+              <CategoryPill
                 key={c.value}
-                onClick={() => { setCategory(c.value); localStorage.setItem('fufu-cat', c.value); setPage(1); }}
-                className={`flex-shrink-0 px-3 py-1.5 rounded-fufu-tag font-cute text-xs transition-all duration-200 flex items-center gap-1.5 touch-target ${
-                  category === c.value
-                    ? 'bg-fufu-teal text-white shadow-sm'
-                    : 'bg-white/80 text-fufu-text-light border border-fufu-teal-soft/20'
-                }`}
-              >
-                <span>{c.emoji}</span>
-                <span>{c.label}</span>
-                {c.value !== 'all' && categoryCounts[c.value] > 0 && (
-                  <span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-body leading-none ${
-                    category === c.value
-                      ? 'bg-white/25 text-white'
-                      : 'bg-fufu-teal-soft/30 text-fufu-text-muted'
-                  }`}>
-                    {categoryCounts[c.value]}
-                  </span>
-                )}
-              </button>
+                compact
+                active={category === c.value}
+                emoji={c.emoji}
+                label={c.label}
+                count={categoryCounts?.[c.value]}
+                onClick={() => pickCategory(c.value)}
+              />
             ))}
           </div>
         </div>
 
         {/* 桌面端：完整筛选项 */}
         <div className="hidden md:flex flex-wrap items-center gap-2 p-3 rounded-fufu-card bg-white/60 border border-fufu-teal-soft/20">
-        {/* 分类筛选 */}
-        <div className="flex flex-wrap gap-1.5">
-          {CATEGORY_OPTIONS.map((c) => (
-            <button
-              key={c.value}
-              onClick={() => { setCategory(c.value); localStorage.setItem('fufu-cat', c.value); setPage(1); }}
-              className={`px-3 py-1.5 rounded-fufu-tag font-cute text-xs transition-all duration-200 flex items-center gap-1.5 ${
-                category === c.value
-                  ? 'bg-fufu-teal text-white shadow-sm'
-                  : 'bg-white text-fufu-text-light hover:bg-fufu-teal-soft/30'
-              }`}
-            >
-              <span>{c.emoji}</span>
-              <span>{c.label}</span>
-              {c.value !== 'all' && categoryCounts[c.value] > 0 && (
-                <span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-body leading-none ${
-                  category === c.value
-                    ? 'bg-white/25 text-white'
-                    : 'bg-fufu-teal-soft/30 text-fufu-text-muted'
-                }`}>
-                  {categoryCounts[c.value]}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
+          <div className="flex flex-wrap gap-1.5">
+            {CATEGORY_OPTIONS.map((c) => (
+              <CategoryPill
+                key={c.value}
+                active={category === c.value}
+                emoji={c.emoji}
+                label={c.label}
+                count={categoryCounts?.[c.value]}
+                onClick={() => pickCategory(c.value)}
+              />
+            ))}
+          </div>
 
           <div className="flex-1" />
 
@@ -215,7 +265,7 @@ export default function HomePage() {
             {SINCE_OPTIONS.map((s) => (
               <button
                 key={s.value}
-                onClick={() => { setSince(s.value); localStorage.setItem('fufu-since', s.value); setPage(1); }}
+                onClick={() => pickSince(s.value)}
                 className={`px-3 py-1.5 rounded-fufu-tag font-cute text-xs transition-all duration-200 ${
                   since === s.value
                     ? 'bg-fufu-lavender/30 text-fufu-text font-medium'
@@ -229,14 +279,17 @@ export default function HomePage() {
 
           {/* 排序 */}
           <select
+            aria-label="排序方式"
             className="appearance-none fufu-input rounded-fufu-btn py-1.5 pl-3 pr-8 font-cute text-xs cursor-pointer
                        bg-white border-2 border-fufu-teal-soft/30 text-fufu-text-light
                        hover:border-fufu-teal/40 focus:border-fufu-teal transition-all"
             value={sort}
-            onChange={(e) => { setSort(e.target.value); localStorage.setItem('fufu-sort', e.target.value); setPage(1); }}
+            onChange={(e) => pickSort(e.target.value)}
           >
             {SORT_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
             ))}
           </select>
 
@@ -257,7 +310,7 @@ export default function HomePage() {
           {SINCE_OPTIONS.map((s) => (
             <button
               key={s.value}
-              onClick={() => { setSince(s.value); localStorage.setItem('fufu-since', s.value); setPage(1); }}
+              onClick={() => pickSince(s.value)}
               className={`flex-shrink-0 px-3 py-1.5 rounded-fufu-tag font-cute text-xs transition-all duration-200 touch-target ${
                 since === s.value
                   ? 'bg-fufu-lavender/30 text-fufu-text font-medium'
@@ -268,13 +321,16 @@ export default function HomePage() {
             </button>
           ))}
           <select
+            aria-label="排序方式"
             className="appearance-none bg-white/80 rounded-fufu-tag py-1.5 pl-3 pr-7 font-cute text-xs cursor-pointer
                        border border-fufu-teal-soft/30 text-fufu-text-light touch-target"
             value={sort}
-            onChange={(e) => { setSort(e.target.value); localStorage.setItem('fufu-sort', e.target.value); setPage(1); }}
+            onChange={(e) => pickSort(e.target.value)}
           >
             {SORT_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
             ))}
           </select>
           {sort === 'random' && (
@@ -288,12 +344,19 @@ export default function HomePage() {
             </button>
           )}
         </div>
+
+        {/* 离线降级提示：之前横幅说"仅展示缓存"，页面却什么都不显示，对不上 */}
+        {fromCache && (
+          <p className="mt-2 text-xs font-body text-fufu-text-muted bg-amber-50 border border-amber-200 rounded-fufu px-3 py-2">
+            📦 后端暂时连不上，下面是从本地缓存里翻出来的旧新闻
+          </p>
+        )}
       </div>
 
       <HeartBurst active={heartState.active} x={heartState.x} y={heartState.y} />
 
       {/* Article list */}
-      {error ? (
+      {error && !fromCache ? (
         <div className="text-center py-20">
           <p className="text-6xl mb-4 animate-float">😿</p>
           <p className="font-cute text-xl text-fufu-text">加载文章失败啦～</p>
@@ -314,28 +377,21 @@ export default function HomePage() {
             </div>
           ))}
         </div>
-      ) : filteredArticles.length === 0 ? (
+      ) : displayArticles.length === 0 ? (
         <div className="text-center py-20">
-          <p className="text-6xl mb-4 animate-float">
-            {category === '动漫' ? '🎬' : category === '游戏' ? '🎮' : category === '科技' ? '💻' : category === '设计' ? '🎨' : category === '综合' ? '📰' : '🍃'}
-          </p>
+          <p className="text-6xl mb-4 animate-float">{EMPTY_EMOJI[category] ?? EMPTY_EMOJI.all}</p>
           <p className="font-cute text-xl text-fufu-text">
-            {category === '动漫' ? '动漫区暂时还没有新闻呢～' :
-             category === '游戏' ? '游戏区暂时空空的～' :
-             category === '科技' ? '科技区等待第一篇投稿～' :
-             category === '设计' ? '设计区还在收集灵感～' :
-             category === '综合' ? '综合区还没有新动态～' :
-             '还没有新闻哦～'}
+            {EMPTY_HINT[category] ?? EMPTY_HINT.all}
           </p>
           <p className="font-body text-sm text-fufu-text-light mt-2 max-w-md mx-auto whitespace-pre-line leading-relaxed">
             {category !== 'all'
-              ? `"${CATEGORY_OPTIONS.find(c => c.value === category)?.label || category}" 分类下暂无文章。试试：\n• 切换到「🌸 全部」查看所有新闻\n• 点击「订阅源」添加更多${category}类RSS源\n• 等待后台自动抓取（每3分钟一次）`
-              : '去「订阅源」页面添加几个感兴趣的RSS源吧！'}
+              ? `「${CATEGORY_OPTIONS.find((c) => c.value === category)?.label || category}」分类下暂无文章。试试：\n• 切换到「🌸 全部」查看所有新闻\n• 点击「订阅源」添加更多 RSS 源\n• 等待后台自动抓取（每 3 分钟一次）`
+              : '去「订阅源」页面添加几个感兴趣的 RSS 源吧！'}
           </p>
           {category !== 'all' && (
             <button
               className="fufu-btn bg-white text-fufu-text-light shadow-fufu rounded-fufu-btn mt-4 text-sm"
-              onClick={() => { setCategory('all'); localStorage.setItem('fufu-cat', 'all'); }}
+              onClick={() => pickCategory('all')}
             >
               返回全部新闻 🌸
             </button>
@@ -343,28 +399,37 @@ export default function HomePage() {
         </div>
       ) : (
         <VirtualArticleList
-          items={filteredArticles}
+          items={displayArticles}
           estimateSize={220}
           renderItem={(a, idx) => (
             <motion.div
               className="pb-4"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.03, duration: 0.35 }}
+              transition={{ delay: Math.min(idx, 6) * 0.03, duration: 0.35 }}
             >
               <TiltCard maxTilt={4}>
                 <Link
                   to={`/articles/${a.id}`}
-                  onClick={() => recordHit.mutate(a.id)}
+                  onClick={(e) => {
+                    // trigger 之前只从 useClickRipple 里解构出来、从来没被调用，
+                    // 于是 <RippleOverlay> 永远渲染的是空数组 —— 涟漪特效是个摆设。
+                    trigger(e);
+                    recordHit.mutate(a.id);
+                  }}
                   className={`fufu-card p-4 sm:p-6 block group relative overflow-hidden rounded-fufu-card news-card-hover ${
                     a.is_read ? 'opacity-70' : ''
                   }`}
                 >
-                  <ScrollParallax speed={0.2} className="absolute top-0 left-0 right-0 h-1 rounded-t-fufu-card z-10">
+                  <ScrollParallax
+                    speed={0.2}
+                    className="absolute top-0 left-0 right-0 h-1 rounded-t-fufu-card z-10"
+                  >
                     <motion.div
                       className="absolute inset-0 rounded-t-fufu-card"
                       style={{
-                        background: 'linear-gradient(90deg, #00e5ff, #39c5bb, #ffb6c1)',
+                        background:
+                          'linear-gradient(90deg, rgb(var(--fufu-teal)), rgb(var(--fufu-teal-deep)), rgb(var(--fufu-pink)))',
                       }}
                       whileHover={{ scaleX: 1.05, x: -2 }}
                       transition={{ type: 'spring', stiffness: 200, damping: 20 }}
@@ -378,29 +443,52 @@ export default function HomePage() {
                           {a.source_name || '🎵 未分类'}
                         </span>
                         {(a.tags ?? []).slice(0, 2).map((tag) => (
-                          <span key={tag} className="fufu-tag bg-fufu-lavender/20 text-fufu-text-light font-body">
+                          <span
+                            key={tag}
+                            className="fufu-tag bg-fufu-lavender/20 text-fufu-text-light font-body"
+                          >
                             {tag}
                           </span>
                         ))}
                       </div>
-                      <h3 className={`font-cute text-lg text-fufu-text group-hover:text-fufu-pink transition-colors line-clamp-2 ${a.is_read ? '' : 'font-bold'}`}>
+                      <h3
+                        className={`font-cute text-lg text-fufu-text group-hover:text-fufu-pink transition-colors line-clamp-2 ${a.is_read ? '' : 'font-bold'}`}
+                      >
                         {!a.is_read && <span className="text-fufu-teal mr-1.5 text-xs">💿</span>}
                         {a.title}
                       </h3>
-                      {a.summary && (() => {
-                        const s = a.summary.replace(/<[^>]+>/g, '').replace(/&[^;]+;/g, ' ').replace(/\s+/g, ' ').trim();
-                        return s ? <p className="font-body text-sm text-fufu-text-light mt-2 line-clamp-2">{s}</p> : null;
-                      })()}
+                      {a.summary &&
+                        (() => {
+                          const s = a.summary
+                            .replace(/<[^>]+>/g, '')
+                            .replace(/&[^;]+;/g, ' ')
+                            .replace(/\s+/g, ' ')
+                            .trim();
+                          return s ? (
+                            <p className="font-body text-sm text-fufu-text-light mt-2 line-clamp-2">
+                              {s}
+                            </p>
+                          ) : null;
+                        })()}
                       <div className="flex items-center gap-4 mt-3 text-xs text-fufu-text-muted font-body">
                         {a.author && <span>{a.author}</span>}
-                        <span>{a.published_at ? new Date(a.published_at).toLocaleDateString('zh-CN') : ''}</span>
+                        <span>
+                          {a.published_at
+                            ? new Date(a.published_at).toLocaleDateString('zh-CN')
+                            : ''}
+                        </span>
                       </div>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-1 mt-4 pt-3 border-t border-fufu-teal-soft/20 relative">
                     <button
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); triggerHeart(e, a.id, a.is_favorite); }}
+                      aria-label={a.is_favorite ? '取消收藏' : '收藏'}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        triggerHeart(e, a.id, a.is_favorite);
+                      }}
                       className={`p-2 rounded-full transition-all duration-200 ${
                         a.is_favorite
                           ? 'text-fufu-teal bg-fufu-teal-soft/30'
@@ -410,8 +498,10 @@ export default function HomePage() {
                       <Star size={20} weight={a.is_favorite ? 'fill' : 'regular'} />
                     </button>
                     <button
+                      aria-label={a.is_later ? '移出稍后阅读' : '加入稍后阅读'}
                       onClick={(e) => {
-                        e.preventDefault(); e.stopPropagation();
+                        e.preventDefault();
+                        e.stopPropagation();
                         toggleLater.mutate({ id: a.id, value: !a.is_later });
                         if (!a.is_later) checkAchievement.mutate({ key: 'later_10' });
                       }}
@@ -441,18 +531,18 @@ export default function HomePage() {
       {total > 0 && (
         <div className="flex items-center justify-center gap-4 mt-8">
           <button
-            className="fufu-btn bg-white text-fufu-text-light disabled:opacity-30 rounded-fufu-btn shadow-fufu"
+            className="fufu-btn bg-white text-fufu-text-light disabled:opacity-30 disabled:cursor-not-allowed rounded-fufu-btn shadow-fufu"
             disabled={page <= 1}
             onClick={() => setPage((p) => p - 1)}
           >
             ← 上一页
           </button>
           <span className="font-cute text-sm text-fufu-text-light">
-            {page} / {Math.ceil(total / pageSize)}
+            {page} / {totalPages}
           </span>
           <button
-            className="fufu-btn bg-white text-fufu-text-light disabled:opacity-30 rounded-fufu-btn shadow-fufu"
-            disabled={page >= Math.ceil(total / pageSize)}
+            className="fufu-btn bg-white text-fufu-text-light disabled:opacity-30 disabled:cursor-not-allowed rounded-fufu-btn shadow-fufu"
+            disabled={page >= totalPages}
             onClick={() => setPage((p) => p + 1)}
           >
             下一页 →

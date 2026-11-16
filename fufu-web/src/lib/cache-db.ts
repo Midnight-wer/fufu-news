@@ -121,21 +121,15 @@ export async function cacheUpsert(articles: ArticleCache[]): Promise<void> {
   db.close();
 }
 
-export async function cacheGet(
-  query: CacheQuery = {},
-): Promise<ArticleCache[]> {
+export async function cacheGet(query: CacheQuery = {}): Promise<ArticleCache[]> {
   const db = await openDB();
   const tx = db.transaction(STORE, 'readonly');
   const store = tx.objectStore(STORE);
   const results: ArticleCache[] = [];
 
   await new Promise<void>((resolve) => {
-    const idx = query.category
-      ? store.index('category')
-      : store.index('publishedAt');
-    const range = query.category
-      ? IDBKeyRange.only(query.category)
-      : undefined;
+    const idx = query.category ? store.index('category') : store.index('publishedAt');
+    const range = query.category ? IDBKeyRange.only(query.category) : undefined;
 
     const cursorReq = idx.openCursor(range, query.category ? 'next' : 'prev');
     let skipped = 0;
@@ -190,7 +184,9 @@ export async function cacheDelete(urls: string[]): Promise<void> {
   const tx = db.transaction(STORE, 'readwrite');
   const store = tx.objectStore(STORE);
   for (const url of urls) store.delete(url);
-  await new Promise<void>((resolve) => { tx.oncomplete = () => resolve(); });
+  await new Promise<void>((resolve) => {
+    tx.oncomplete = () => resolve();
+  });
   db.close();
 }
 
@@ -198,7 +194,9 @@ export async function cacheClear(): Promise<void> {
   const db = await openDB();
   const tx = db.transaction(STORE, 'readwrite');
   tx.objectStore(STORE).clear();
-  await new Promise<void>((resolve) => { tx.oncomplete = () => resolve(); });
+  await new Promise<void>((resolve) => {
+    tx.oncomplete = () => resolve();
+  });
   db.close();
 }
 
@@ -219,7 +217,9 @@ export async function cacheSelfCheck(): Promise<boolean> {
       cachedAt: Date.now(),
     };
     store.put(testItem);
-    await new Promise<void>((r) => { tx.oncomplete = () => r(); });
+    await new Promise<void>((r) => {
+      tx.oncomplete = () => r();
+    });
     const tx2 = db.transaction(STORE, 'readonly');
     const getReq = tx2.objectStore(STORE).get('__self_check__');
     const result = await new Promise<ArticleCache | undefined>((resolve) => {
@@ -248,11 +248,17 @@ export async function cacheIntegrityCheck(): Promise<{ total: number; corrupt: n
     const cursorReq = store.openCursor();
     cursorReq.onsuccess = () => {
       const cursor = cursorReq.result;
-      if (!cursor) { resolve(); return; }
+      if (!cursor) {
+        resolve();
+        return;
+      }
       total++;
       const item = cursor.value;
       for (const f of requiredFields) {
-        if (!item[f]) { corrupt++; break; }
+        if (!item[f]) {
+          corrupt++;
+          break;
+        }
       }
       cursor.continue();
     };

@@ -4,8 +4,8 @@ fufu新闻 - 排行榜 Pydantic Schema
 定义排行榜相关的请求/响应数据结构（Pydantic 模型）。
 """
 from datetime import datetime
+
 from pydantic import BaseModel
-from typing import Optional
 
 
 class RankingItem(BaseModel):
@@ -29,13 +29,13 @@ class RankingItem(BaseModel):
     article_id: int
     title: str
     source_name: str
-    image_url: Optional[str] = None
+    image_url: str | None = None
     hot_score: float
     view_count: int
     comment_count: int
     collect_count: int
-    trend: Optional[str] = None
-    hot_label: Optional[str] = None
+    trend: str | None = None
+    hot_label: str | None = None
 
 
 class RankingResponse(BaseModel):

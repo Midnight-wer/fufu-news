@@ -7,9 +7,10 @@ FastAPI 依赖注入函数，用于认证、授权和数据库会话注入。
 - get_current_user: 从 JWT Bearer Token 中解析当前登录用户
 """
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.database import get_db
 from app.core.security import decode_access_token
 from app.models.user import User

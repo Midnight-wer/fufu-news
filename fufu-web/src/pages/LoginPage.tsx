@@ -57,12 +57,8 @@ export default function LoginPage() {
           >
             🌸
           </motion.p>
-          <h1 className="font-cute text-4xl text-fufu-pink tracking-wide">
-            fufu新闻
-          </h1>
-          <p className="font-cute text-sm text-fufu-text-light mt-2">
-            你的甜系阅读伙伴 💕
-          </p>
+          <h1 className="font-cute text-4xl text-fufu-pink tracking-wide">fufu新闻</h1>
+          <p className="font-cute text-sm text-fufu-text-light mt-2">你的甜系阅读伙伴 💕</p>
         </div>
 
         {/* Form */}
@@ -74,9 +70,7 @@ export default function LoginPage() {
           transition={{ delay: 0.15, duration: 0.4 }}
         >
           <div>
-            <label className="font-cute text-sm text-fufu-text-light block mb-1">
-              用户名
-            </label>
+            <label className="font-cute text-sm text-fufu-text-light block mb-1">用户名</label>
             <input
               className="fufu-input rounded-fufu-input"
               value={username}
@@ -87,9 +81,7 @@ export default function LoginPage() {
             />
           </div>
           <div>
-            <label className="font-cute text-sm text-fufu-text-light block mb-1">
-              密码
-            </label>
+            <label className="font-cute text-sm text-fufu-text-light block mb-1">密码</label>
             <input
               className="fufu-input rounded-fufu-input"
               type="password"

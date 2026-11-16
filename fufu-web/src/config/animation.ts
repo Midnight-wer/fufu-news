@@ -45,11 +45,6 @@ export const anim = {
     damping: 18,
     maxOpacity: 0.35,
   },
-  jellyCard: {
-    scaleAmount: 1.02,
-    stiffness: 200,
-    damping: 15,
-  },
   scrollRubberBand: {
     maxOverscroll: 24,
     stiffness: 150,
@@ -63,19 +58,3 @@ export const anim = {
 };
 
 export type AnimConfig = typeof anim;
-
-/**
- * 根据特效强度 (0–100) 线性缩放数值型参数。
- * intensity=0 时返回最小值（通常为原始值的 10%），intensity=100 时返回完整值。
- */
-export function scaleByIntensity<T extends Record<string, number>>(
-  cfg: T,
-  intensity: number,
-): T {
-  const factor = intensity / 100;
-  const scaled = {} as Record<string, number>;
-  for (const key of Object.keys(cfg)) {
-    scaled[key] = cfg[key] * (0.1 + 0.9 * factor);
-  }
-  return scaled as T;
-}

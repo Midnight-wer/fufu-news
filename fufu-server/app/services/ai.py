@@ -11,9 +11,11 @@ AI 服务核心模块——封装 AI API 调用的底层逻辑。
 底层使用 _chat() 函数与 AI API 通信（OpenAI 兼容接口）。
 """
 import json
-import re
 import logging
+import re
+
 import httpx
+
 from app.core.config import settings
 
 # AI 服务日志记录器
@@ -99,8 +101,16 @@ async def _chat(
     返回:
         str | None: AI 的文本回复，失败返回 None
     """
-    import asyncio, random
+    import asyncio
+    import random
+    from urllib.parse import urlparse
+
+    default_host = (urlparse(settings.ai_base_url).hostname or "").lower()
     url = (base_url or settings.ai_base_url).rstrip("/")
+    # 防御：自定义地址（非服务端默认主机）不得回退服务端密钥，
+    # 否则攻击者填自己的地址、不填 key，即可骗取服务端真实 Key（SSRF + 密钥外泄）。
+    if base_url and (urlparse(url).hostname or "").lower() != default_host and not api_key:
+        raise ValueError("使用自定义 AI 地址时必须提供 api_key，不会回退服务端密钥")
     key = api_key or settings.ai_api_key
     m = model or settings.ai_model
 
@@ -160,7 +170,7 @@ async def _chat(
                     detail += f": {body['error']}"
             except Exception:
                 detail += f": {e.response.text[:300]}"
-            raise RuntimeError(f"AI 服务返回错误 — {detail}")
+            raise RuntimeError(f"AI 服务返回错误 — {detail}") from e
         except Exception as e:
             last_error = e
             if attempt < 2:
@@ -383,8 +393,8 @@ def _parse_deep_summary_json(raw: str) -> dict | None:
     返回:
         dict | None: 解析成功返回结构化摘要，失败返回 None
     """
-    from datetime import datetime, timezone
     import re as _re
+    from datetime import datetime, timezone
 
     candidates = []
 
@@ -484,6 +494,9 @@ async def process_article(
     """
     result = {"summary": None, "tags": None}
 
+    # 质检闭环：惰性导入（避免循环依赖，且只在有 db 的入口才需要）
+    from app.services import ai_quality
+
     # 如果启用了自动摘要
     if settings.ai_auto_summary:
         summary = await generate_summary(
@@ -491,8 +504,16 @@ async def process_article(
             model=model, base_url=base_url, api_key=api_key,
         )
         if summary:
+            # 质检：摘要过短/纯符号视为低质，仍保留但记录经验（不阻断）
+            if not ai_quality.quality_check_summary(summary):
+                await ai_quality.record_parse_failure(
+                    db, "summary", summary, note="摘要质检低质"
+                )
             article.summary = summary
             result["summary"] = summary
+        else:
+            # 摘要生成为空：沉淀失败经验
+            await ai_quality.record_parse_failure(db, "summary", "", note="摘要生成为空")
 
     # 如果启用了自动标签
     if settings.ai_auto_tag:
@@ -501,8 +522,15 @@ async def process_article(
             model=model, base_url=base_url, api_key=api_key,
         )
         if tags:
-            article.tags = tags
-            result["tags"] = tags
+            # 质检闭环：用记忆层的 tag_fix 经验做二次修正
+            fixed = await ai_quality.apply_tag_fixes(db, tags)
+            if not ai_quality.quality_check_tags(fixed):
+                await ai_quality.record_parse_failure(db, "tags", str(fixed), note="打标质检异常")
+            article.tags = fixed
+            result["tags"] = fixed
+        else:
+            # 打标为空：沉淀失败经验
+            await ai_quality.record_parse_failure(db, "tags", "", note="打标生成为空")
 
     # 有任意内容被更新时，刷新到数据库
     if result["summary"] or result["tags"]:

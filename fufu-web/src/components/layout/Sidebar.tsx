@@ -1,5 +1,14 @@
 import { NavLink } from 'react-router-dom';
-import { House, Rss, Star, BookmarkSimple, MagnifyingGlass, Gear, Fire, Clock } from '@phosphor-icons/react';
+import {
+  House,
+  Rss,
+  Star,
+  BookmarkSimple,
+  MagnifyingGlass,
+  Gear,
+  Fire,
+  Clock,
+} from '@phosphor-icons/react';
 import { useSettingsStore } from '../../stores/settingsStore';
 
 const navItems = [
@@ -27,12 +36,9 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="px-6 pt-8 pb-6">
         <h1 className="font-cute text-2xl tracking-wide miku-gradient-text">
-          fufu新闻{' '}
-          <span className="inline-block animate-float text-lg">{sub.icon}</span>
+          fufu新闻 <span className="inline-block animate-float text-lg">{sub.icon}</span>
         </h1>
-        <p className="font-cute text-xs text-fufu-text-light mt-1">
-          {sub.text}
-        </p>
+        <p className="font-cute text-xs text-fufu-text-light mt-1">{sub.text}</p>
       </div>
 
       {/* Navigation */}

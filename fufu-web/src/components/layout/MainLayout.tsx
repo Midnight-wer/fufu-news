@@ -14,19 +14,22 @@ export default function MainLayout() {
   const navigate = useNavigate();
 
   // 键盘快捷键
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    // Ctrl+K / Cmd+K → 搜索页
-    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-      e.preventDefault();
-      navigate('/search');
-      return;
-    }
-    // ESC → 关闭移动端菜单
-    if (e.key === 'Escape') {
-      setMobileMenuOpen(false);
-      return;
-    }
-  }, [navigate]);
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      // Ctrl+K / Cmd+K → 搜索页
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        navigate('/search');
+        return;
+      }
+      // ESC → 关闭移动端菜单
+      if (e.key === 'Escape') {
+        setMobileMenuOpen(false);
+        return;
+      }
+    },
+    [navigate],
+  );
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
@@ -72,15 +75,26 @@ export default function MainLayout() {
         )}
       </AnimatePresence>
 
-      {/* 移动端汉堡按钮 */}
-      <button
-        onClick={() => setMobileMenuOpen(true)}
-        className="md:hidden fixed top-4 left-4 z-30 p-3 rounded-fufu bg-fufu-white/90 shadow-fufu text-fufu-text-light hover:text-fufu-pink transition-colors"
-      >
-        <List size={24} />
-      </button>
+      {/*
+        移动端汉堡按钮。抽屉打开时隐藏 —— 否则它会和抽屉里的关闭按钮
+        在同一位置叠着出现，视觉上像两个重叠的图标。
+      */}
+      {!mobileMenuOpen && (
+        <button
+          type="button"
+          aria-label="打开菜单"
+          onClick={() => setMobileMenuOpen(true)}
+          className="md:hidden fixed top-4 left-4 z-30 p-3 rounded-fufu bg-fufu-white/90 shadow-fufu text-fufu-text-light hover:text-fufu-pink transition-colors"
+        >
+          <List size={24} />
+        </button>
+      )}
 
-      <main ref={scrollRef} id="main-scroll" className="flex-1 overflow-y-auto relative pb-mobile-nav md:pb-0">
+      <main
+        ref={scrollRef}
+        id="main-scroll"
+        className="flex-1 overflow-y-auto relative pb-mobile-nav md:pb-0"
+      >
         <FloatingParticles />
         <ScrollRubberBand scrollContainerRef={scrollRef}>
           <motion.div

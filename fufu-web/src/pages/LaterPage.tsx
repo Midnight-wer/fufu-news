@@ -28,7 +28,9 @@ export default function LaterPage() {
         <div className="text-center py-20">
           <p className="text-6xl mb-4 animate-float">😿</p>
           <p className="font-cute text-xl text-fufu-text">加载列表失败啦～</p>
-          <button className="fufu-btn-primary mt-4" onClick={() => refetch()}>重新加载</button>
+          <button className="fufu-btn-primary mt-4" onClick={() => refetch()}>
+            重新加载
+          </button>
         </div>
       ) : showLoading ? (
         <div className="space-y-4">
@@ -43,25 +45,44 @@ export default function LaterPage() {
         <div className="text-center py-20">
           <p className="text-6xl mb-4 animate-float">☕</p>
           <p className="font-cute text-xl text-fufu-text">这里还空空的呢～</p>
-          <p className="font-body text-sm text-fufu-text-light mt-2">看到感兴趣的文章可以先存下来哦！</p>
+          <p className="font-body text-sm text-fufu-text-light mt-2">
+            看到感兴趣的文章可以先存下来哦！
+          </p>
         </div>
       ) : (
         <VirtualArticleList
           items={articles}
           estimateSize={160}
           renderItem={(a, idx) => (
-            <motion.div className="pb-4" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.02 }}>
+            <motion.div
+              className="pb-4"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: idx * 0.02 }}
+            >
               <TiltCard maxTilt={2}>
                 <ClickRippleWrapper>
-                  <Link to={`/articles/${a.id}`} className="fufu-card p-6 block group rounded-fufu-card news-card-hover">
+                  <Link
+                    to={`/articles/${a.id}`}
+                    className="fufu-card p-6 block group rounded-fufu-card news-card-hover"
+                  >
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
-                        <span className="fufu-tag bg-fufu-mint-light/50 text-fufu-mint font-cute">{a.source_name || '🌸 未分类'}</span>
-                        <h3 className="font-cute text-lg text-fufu-text group-hover:text-fufu-lavender transition-colors line-clamp-2 mt-2">{a.title}</h3>
-                        <p className="font-body text-sm text-fufu-text-light mt-2 line-clamp-2">{a.summary}</p>
+                        <span className="fufu-tag bg-fufu-mint-light/50 text-fufu-mint font-cute">
+                          {a.source_name || '🌸 未分类'}
+                        </span>
+                        <h3 className="font-cute text-lg text-fufu-text group-hover:text-fufu-lavender transition-colors line-clamp-2 mt-2">
+                          {a.title}
+                        </h3>
+                        <p className="font-body text-sm text-fufu-text-light mt-2 line-clamp-2">
+                          {a.summary}
+                        </p>
                       </div>
                       <button
-                        onClick={(e) => { e.preventDefault(); toggleLater.mutate({ id: a.id, value: false }); }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          toggleLater.mutate({ id: a.id, value: false });
+                        }}
                         className="p-2 rounded-full text-fufu-mint bg-fufu-mint-light/30 hover:bg-fufu-mint-light/50 transition-all shrink-0 ml-4"
                       >
                         <BookmarkSimple size={20} weight="fill" />
@@ -77,9 +98,23 @@ export default function LaterPage() {
 
       {total > 0 && (
         <div className="flex items-center justify-center gap-4 mt-8">
-          <button className="fufu-btn bg-white text-fufu-text-light disabled:opacity-30 rounded-fufu-btn shadow-fufu" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>← 上一页</button>
-          <span className="font-cute text-sm text-fufu-text-light">{page} / {Math.ceil(total / pageSize)}</span>
-          <button className="fufu-btn bg-white text-fufu-text-light disabled:opacity-30 rounded-fufu-btn shadow-fufu" disabled={page >= Math.ceil(total / pageSize)} onClick={() => setPage((p) => p + 1)}>下一页 →</button>
+          <button
+            className="fufu-btn bg-white text-fufu-text-light disabled:opacity-30 rounded-fufu-btn shadow-fufu"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => p - 1)}
+          >
+            ← 上一页
+          </button>
+          <span className="font-cute text-sm text-fufu-text-light">
+            {page} / {Math.ceil(total / pageSize)}
+          </span>
+          <button
+            className="fufu-btn bg-white text-fufu-text-light disabled:opacity-30 rounded-fufu-btn shadow-fufu"
+            disabled={page >= Math.ceil(total / pageSize)}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            下一页 →
+          </button>
         </div>
       )}
     </div>

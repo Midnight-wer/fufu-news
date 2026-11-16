@@ -5,9 +5,11 @@ fufu新闻 - 抓取日志模型
 每次 RSS 抓取操作都会生成一条日志记录，用于追踪抓取的成功/失败状态、
 新增文章数量以及错误信息。
 """
-from sqlalchemy import String, Integer, DateTime, Text, ForeignKey
-from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime, timezone
+
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column
+
 from app.core.database import Base
 
 

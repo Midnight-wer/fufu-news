@@ -1,6 +1,14 @@
 import { useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, Fire, TagSimple, Newspaper, Sparkle, CaretRight, CaretLeft } from '@phosphor-icons/react';
+import {
+  Heart,
+  Fire,
+  TagSimple,
+  Newspaper,
+  Sparkle,
+  CaretRight,
+  CaretLeft,
+} from '@phosphor-icons/react';
 import { motion } from 'framer-motion';
 import { usePersonalizedRecommendations } from '../../hooks/useRecommendations';
 
@@ -17,18 +25,38 @@ function formatHotScore(score: number): string {
 /** 推荐理由 → 图标 + 配色 */
 function getReasonMeta(reason: string): { icon: React.ReactNode; bg: string; textColor: string } {
   if (reason.includes('喜欢') || reason.includes('阅读')) {
-    return { icon: <Heart size={12} weight="fill" />, bg: 'bg-fufu-pink-soft/30', textColor: 'text-fufu-pink' };
+    return {
+      icon: <Heart size={12} weight="fill" />,
+      bg: 'bg-fufu-pink-soft/30',
+      textColor: 'text-fufu-pink',
+    };
   }
   if (reason.includes('热门') || reason.includes('趋势')) {
-    return { icon: <Fire size={12} weight="fill" />, bg: 'bg-orange-100', textColor: 'text-orange-500' };
+    return {
+      icon: <Fire size={12} weight="fill" />,
+      bg: 'bg-orange-100',
+      textColor: 'text-orange-500',
+    };
   }
   if (reason.includes('标签') || reason.includes('相似')) {
-    return { icon: <TagSimple size={12} weight="fill" />, bg: 'bg-fufu-teal-soft/30', textColor: 'text-fufu-teal-deep' };
+    return {
+      icon: <TagSimple size={12} weight="fill" />,
+      bg: 'bg-fufu-teal-soft/30',
+      textColor: 'text-fufu-teal-deep',
+    };
   }
   if (reason.includes('常读') || reason.includes('来源') || reason.includes('同源')) {
-    return { icon: <Newspaper size={12} weight="fill" />, bg: 'bg-fufu-lavender/20', textColor: 'text-fufu-lavender' };
+    return {
+      icon: <Newspaper size={12} weight="fill" />,
+      bg: 'bg-fufu-lavender/20',
+      textColor: 'text-fufu-lavender',
+    };
   }
-  return { icon: <Sparkle size={12} weight="fill" />, bg: 'bg-fufu-highlight/60', textColor: 'text-fufu-text-light' };
+  return {
+    icon: <Sparkle size={12} weight="fill" />,
+    bg: 'bg-fufu-highlight/60',
+    textColor: 'text-fufu-text-light',
+  };
 }
 
 /** 单张推荐卡片 */
@@ -183,7 +211,7 @@ export default function RecommendationWidget() {
             'overflow-x-auto overflow-y-hidden',
             'scrollbar-fufu',
             'flex gap-3 sm:gap-4',
-            'py-3 px-1',           // 内边距撑开，防阴影被切
+            'py-3 px-1', // 内边距撑开，防阴影被切
           ].join(' ')}
         >
           {showLoading

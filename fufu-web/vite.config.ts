@@ -23,6 +23,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    sourcemap: true,
+    target: 'es2020',
+    sourcemap: false,
   },
 })

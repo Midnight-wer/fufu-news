@@ -12,7 +12,8 @@ fufu新闻 - 统一响应格式
 - code 字段在成功时固定为 200，失败时为对应 HTTP 状态码
 - message 字段在成功时为 "ok"，失败时为业务友好的错误提示
 """
-from typing import Any, TypeVar, Generic
+from typing import Any, Generic, TypeVar
+
 from pydantic import BaseModel
 
 T = TypeVar("T")  # 泛型类型变量
@@ -30,7 +31,7 @@ class ApiResponse(BaseModel, Generic[T]):
     message: str = "ok"
 
 
-def success(data: Any = [], message: str = "ok") -> dict:
+def success(data: Any = None, message: str = "ok") -> dict:
     """
     构建成功响应。
 
@@ -43,10 +44,15 @@ def success(data: Any = [], message: str = "ok") -> dict:
 
     注意:
         data 永远不会返回 None——如果传入 None，将被替换为空列表 []
+
+    默认值用 None 而不是 []：
+        Python 的默认参数只在**函数定义时求值一次**，所以 `data=[]` 会让
+        所有调用共享同一个 list 对象。一旦有人往里 append，这个"脏数据"
+        会跨请求一直留着 —— 典型的共享可变状态 bug。
     """
     return {
         "code": 200,
-        "data": data if data is not None else [],
+        "data": [] if data is None else data,
         "message": message,
     }
 
