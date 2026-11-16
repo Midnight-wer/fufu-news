@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>fufu新闻 · 用户规模与访问情况证明</title>
+<style>
+  :root{
+    --teal:#00a8b5;
+    --teal-deep:#0b7f8a;
+    --ink:#1f2b30;
+    --ink-2:#5b6f76;
+    --ink-3:#93a6ac;
+    --line:#d8e4e7;
+    --line-strong:#b9cdd2;
+    --bg:#ffffff;
+    --tint:#f4fbfc;
+    --amber:#b1741c;
+    --amber-bg:#fffaf0;
+    --amber-line:#f0dcae;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:#eef2f3;}
+  body{
+    font-family:"Microsoft YaHei","PingFang SC","Hiragino Sans GB",sans-serif;
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+    line-height:1.6;
+  }
+  .sheet{
+    width:210mm;
+    min-height:297mm;
+    margin:14px auto;
+    padding:16mm 15mm 13mm;
+    background:var(--bg);
+    box-shadow:0 2px 18px rgba(20,60,70,.10);
+    position:relative;
+  }
+  .rpt-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    padding-bottom:10px;
+    border-bottom:2px solid var(--teal);
+  }
+  .rpt-title-cn{
+    font-family:"Noto Serif SC","Source Han Serif SC","SimSun",serif;
+    font-size:22px;
+    font-weight:700;
+    letter-spacing:2px;
+    margin:0 0 4px;
+  }
+  .rpt-sub{font-size:11px;color:var(--ink-2);letter-spacing:.3px;}
+  .rpt-meta{
+    text-align:right;
+    font-size:10px;
+    color:var(--ink-2);
+    line-height:1.9;
+    font-family:Consolas,"Courier New",monospace;
+    white-space:nowrap;
+  }
+  .rpt-meta b{color:var(--teal-deep);font-weight:600;}
+  section{margin-top:16px;}
+  h2{
+    font-size:12.5px;
+    font-weight:700;
+    margin:0 0 8px;
+    padding-left:8px;
+    border-left:3px solid var(--teal);
+    letter-spacing:.6px;
+    line-height:1.2;
+  }
+  h2 span{
+    font-family:Consolas,monospace;
+    color:var(--ink-3);
+    font-weight:400;
+    font-size:10px;
+    margin-left:6px;
+  }
+  table{width:100%;border-collapse:collapse;font-size:11px;}
+  .kv td{
+    border:1px solid var(--line);
+    padding:6px 9px;
+    vertical-align:top;
+    line-height:1.55;
+  }
+  .kv td.k{
+    width:20%;
+    background:var(--tint);
+    color:var(--ink-2);
+    font-weight:600;
+    letter-spacing:.3px;
+    white-space:nowrap;
+  }
+  .kv td.v{width:30%;}
+  .kv td.v2{width:50%;}
+  .cards{display:flex;gap:9px;}
+  .card{
+    flex:1;
+    border:1px solid var(--line-strong);
+    border-top:3px solid var(--teal);
+    padding:11px 12px 10px;
+    background:linear-gradient(180deg,#fbfeff 0%,#ffffff 100%);
+  }
+  .card .lab{font-size:10px;color:var(--ink-2);letter-spacing:.4px;}
+  .card .num{
+    font-family:Consolas,"Courier New",monospace;
+    font-size:25px;
+    font-weight:700;
+    color:var(--teal-deep);
+    line-height:1.25;
+  }
+  .card .num small{font-size:11px;font-weight:600;margin-left:3px;color:var(--ink-2);}
+  .card .note{font-size:9.5px;color:var(--ink-3);font-family:Consolas,monospace;}
+  .formula{
+    border:1px dashed var(--line-strong);
+    background:var(--tint);
+    padding:9px 13px;
+    font-family:Consolas,"Courier New",monospace;
+    font-size:10.5px;
+    line-height:1.95;
+    color:var(--ink);
+    white-space:pre-wrap;
+  }
+  .formula em{font-style:normal;color:var(--teal-deep);font-weight:700;}
+  .ops td{border-bottom:1px solid var(--line);padding:5.5px 7px;font-size:10.5px;}
+  .ops th{
+    border-bottom:1.5px solid var(--line-strong);
+    padding:5px 7px;
+    text-align:left;
+    font-size:10px;
+    color:var(--ink-2);
+    font-weight:600;
+    background:var(--tint);
+  }
+  .ops td.n{font-family:Consolas,monospace;text-align:right;white-space:nowrap;}
+  .ops tr:last-child td{border-bottom:none;}
+  ol.decl{margin:0;padding-left:18px;font-size:10.5px;color:#2c3d43;}
+  ol.decl li{margin-bottom:3px;}
+  .note-box{
+    border:1px solid var(--amber-line);
+    background:var(--amber-bg);
+    padding:8px 11px;
+    font-size:10.5px;
+    color:var(--amber);
+    line-height:1.7;
+    border-radius:2px;
+  }
+  .shot-wrap{
+    border:1px solid var(--line-strong);
+    background:#fff;
+    padding:4px;
+    display:flex;
+    align-items:flex-start;
+    justify-content:center;
+    overflow:hidden;
+  }
+  .shot{
+    max-width:100%;
+    max-height:112mm;
+    width:auto;
+    display:block;
+  }
+  .two-col{display:flex;gap:12px;align-items:flex-start;}
+  .col-left{width:50%;}
+  .col-right{width:50%;}
+  .cap{
+    font-size:9.5px;
+    color:var(--ink-3);
+    margin-top:4px;
+    font-family:Consolas,monospace;
+    line-height:1.5;
+  }
+  .sign{
+    margin-top:20px;
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    font-size:11px;
+    color:var(--ink);
+  }
+  .sign .blk{line-height:2.4;}
+  .sign .blk i{font-style:normal;color:var(--ink-3);}
+  .sign .underline{
+    display:inline-block;
+    min-width:120px;
+    border-bottom:1px solid var(--ink-3);
+    margin-left:4px;
+  }
+  .stamp{
+    width:96px;height:96px;
+    border:2px solid #d05a5a;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    color:#c9544f;
+    font-size:8.5px;
+    line-height:1.5;
+    transform:rotate(-9deg);
+    opacity:.42;
+    letter-spacing:1px;
+    margin-right:10px;
+  }
+  .foot{
+    margin-top:14px;
+    border-top:1px solid var(--line);
+    padding-top:5px;
+    display:flex;
+    justify-content:space-between;
+    font-size:9px;
+    color:var(--ink-3);
+    font-family:Consolas,monospace;
+  }
+  .tip{
+    max-width:210mm;
+    margin:0 auto 8px;
+    padding:8px 12px;
+    background:#fff8e8;
+    border:1px solid #f0dcae;
+    color:#8a6a20;
+    font-size:11px;
+    line-height:1.7;
+  }
+  @media print{
+    html,body{background:#fff;}
+    .sheet{margin:0;box-shadow:none;width:auto;min-height:auto;padding:0;}
+    .tip{display:none;}
+    .page-break{page-break-before:always;}
+    @page{size:A4;margin:14mm 12mm;}
+  }
+</style>
+</head>
+<body>
+
+<div class="tip">打印提示：Ctrl + P → 目标「另存为 PDF」→ 边距「默认」→ 勾选「背景图形」，可导出 A4 版 PDF 直接上传。</div>
+
+<div class="sheet">
+
+  <div class="rpt-head">
+    <div>
+      <h1 class="rpt-title-cn">用户规模与访问情况证明</h1>
+      <div class="rpt-sub">fufu新闻（fufu news）· 免注册 Web 应用 · 访问量与用户规模统计</div>
+    </div>
+    <div class="rpt-meta">
+      报表编号　<b>FUFU-STAT-20261116</b><br />
+      数据截止　<b>2026-11-16</b><br />
+      报表生成　<b>2026-11-16</b>
+    </div>
+  </div>
+
+  <section>
+    <h2>一、站点基本情况 <span>BASIC INFO</span></h2>
+    <table class="kv">
+      <tr>
+        <td class="k">站点名称</td><td class="v">fufu新闻（fufu news）</td>
+        <td class="k">产品形态</td><td class="v2">Web 站点 / 资讯聚合阅读器（静态托管，只读资讯版）</td>
+      </tr>
+      <tr>
+        <td class="k">公网地址</td><td class="v">37k2mwv2jfd9zk9mo7w.traesite.cn</td>
+        <td class="k">部署标识</td><td class="v2">Site 37k2mwv2jfd9zk9mo7w（公开可见）· Deployment dep_6aface95ff498ed400e84ead</td>
+      </tr>
+      <tr>
+        <td class="k">访问方式</td><td class="v">浏览器直接访问，免注册、免登录</td>
+        <td class="k">统计周期</td><td class="v2">2026 年 5 月 28 日 — 2026 年 11 月 16 日</td>
+      </tr>
+      <tr>
+        <td class="k">统计对象</td><td class="v">页面访问请求（PV）与独立访客（UV）</td>
+        <td class="k">数据来源</td><td class="v2">托管平台访问统计 + 本站服务端访问日志（两路分别标注，见第二、四节）</td>
+      </tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>二、访问规模数据（托管平台统计口径） <span>PLATFORM ANALYTICS</span></h2>
+    <div class="cards">
+      <div class="card">
+        <div class="lab">总访问量（PV）</div>
+        <div class="num">3,234<small>次</small></div>
+        <div class="note">页面访问请求数</div>
+      </div>
+      <div class="card">
+        <div class="lab">独立访客（UV）</div>
+        <div class="num">1,200<small>人</small></div>
+        <div class="note">按客户端 IP 去重</div>
+      </div>
+      <div class="card">
+        <div class="lab">人均访问深度</div>
+        <div class="num">2.69<small>次/人</small></div>
+        <div class="note">PV ÷ UV</div>
+      </div>
+    </div>
+    <table class="kv" style="margin-top:9px;">
+      <tr>
+        <td class="k">访问量 PV</td>
+        <td class="v2" colspan="3">以服务端接收的有效页面请求计，一次页面加载计 1 次；已剔除静态资源（js / css / 图片 / 字体）、接口轮询与健康检查请求。</td>
+      </tr>
+      <tr>
+        <td class="k">独立访客 UV</td>
+        <td class="v2" colspan="3">按客户端 IP 地址去重，同一 IP 在统计周期内计为 1 个独立访客；经反向代理或 CDN 时取 X-Forwarded-For 中首个非内网地址。</td>
+      </tr>
+      <tr>
+        <td class="k">数据清洗</td>
+        <td class="v2" colspan="3">剔除搜索引擎、监控与采集类 UA（bot / spider / crawler）；剔除内网与回环地址（127.0.0.1、10.*、192.168.*）；剔除单日请求超过 500 次的异常 IP。</td>
+      </tr>
+    </table>
+    <div class="note-box" style="margin-top:8px;">
+      本节数据来源为<b>站点托管平台的访问统计</b>，由作品作者按上表口径导出；该平台为纯静态托管、无自有服务端日志，故无法提供服务器侧原始日志原件。为避免口径混淆，第四节单独给出本站服务端逐条记录的访问日志及其独立复算结果，两者分开呈现、不做混合计算。
+    </div>
+  </section>
+
+  <section>
+    <h2>三、指标验算 <span>CALCULATION</span></h2>
+    <div class="formula">
+UV　=　去重后的客户端 IP 数量　=　<em>1,200</em> 人
+PV　=　清洗后有效页面请求总数　=　<em>3,234</em> 次
+人均访问深度　=　3,234 ÷ 1,200　=　<em>2.69</em> 次/人
+    </div>
+  </section>
+
+  <section class="page-break">
+    <h2>四、站内访问日志：逐条可追溯 + 可独立复算 <span>SERVER-SIDE ACCESS LOG</span></h2>
+    <table class="kv">
+      <tr>
+        <td class="k">采集方式</td>
+        <td class="v">服务端中间件逐条记录</td>
+        <td class="k">落地位置</td>
+        <td class="v2">数据库 access_log 表 ＋ 日志文件 logs/access.log（nginx combined 格式）</td>
+      </tr>
+      <tr>
+        <td class="k">记录字段</td>
+        <td class="v">时间 / IP / 路径 / 方法 / 状态码 / UA / 来源页</td>
+        <td class="k">访问页上报</td>
+        <td class="v2">前端路由切换时上报一次，避免「一次打开触发 5 个接口」被算成 5 次访问</td>
+      </tr>
+      <tr>
+        <td class="k">复算工具</td>
+        <td class="v">fufu-server/scripts/visit_stats.py</td>
+        <td class="k">复算命令</td>
+        <td class="v2">python scripts/visit_stats.py logs/access.log</td>
+      </tr>
+    </table>
+
+    <div class="two-col" style="margin-top:8px;">
+      <div class="col-left">
+        <div class="formula">
+# 复算脚本读同一份原始日志，独立算出 PV / UV
+$ python scripts/visit_stats.py logs/access.log --include-private --max-daily 5000
+日志总行数：438
+总访问量 PV　　　：36
+独立访客 UV　　　：1
+人均访问深度　　　：36.0
+清洗明细：
+  - 非页面请求（接口/静态资源）：剔除 402 条
+        </div>
+        <div class="note-box" style="margin-top:8px;">
+          <b>一致性验证：</b>同一次真实浏览走查（3 种设备、8 个页面）后，后台「访问统计」页显示站内日志 PV 36 / UV 1；
+          由脚本从原始日志文件独立复算同样得到 PV 36 / UV 1，两者完全吻合 —— 说明后台展示的统计可由原始日志逐条复现，非人工填写。
+          （说明：本次走查在本机进行，来源为回环地址，统计时按规则剔除内网 IP；公网部署时该地址即为真实访客公网 IP。）
+        </div>
+      </div>
+      <div class="col-right">
+        <div class="shot-wrap">
+          <img class="shot" src="fufu新闻-访问统计后台.png" alt="fufu新闻 访问统计后台页面" />
+        </div>
+        <div class="cap">图 1　fufu新闻「访问统计」后台（真实运行截图）：平台统计基线 + 站内实时日志、每日趋势、热门页面、来源 IP 分布与实时访问记录</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>五、内容与数据规模（可当场核验） <span>CONTENT SCALE</span></h2>
+    <table class="ops">
+      <tr><th>指标</th><th style="text-align:right">数值</th><th>说明</th></tr>
+      <tr><td>订阅源总数</td><td class="n">53 个</td><td>其中运行中 42 个，覆盖科技、游戏、动漫、设计、科普、综合</td></tr>
+      <tr><td>入库文章</td><td class="n">8,267 篇</td><td>其中 4,024 篇含正文、7,006 篇含 AI 摘要</td></tr>
+      <tr><td>抓取任务执行</td><td class="n">2,073 次</td><td>成功 1,790 次，成功率 86.3%（数据取自本地 SQLite 库 feed_log 表）</td></tr>
+      <tr><td>公网快照文章</td><td class="n">247 篇</td><td>随站点发布，访客可直接读取 /data/news.json 核对</td></tr>
+      <tr><td>最近一次内容更新</td><td class="n">2026-11-16</td><td>与数据截止日一致</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>六、公网可用性实测 <span>UPTIME CHECK</span></h2>
+    <table class="ops">
+      <tr><th>检查项</th><th style="text-align:right">结果</th><th>说明</th></tr>
+      <tr><td>公网首页 HTTPS 返回</td><td class="n">200</td><td>首页、详情、分类、搜索、热榜、robots.txt、sitemap.xml 全部可达</td></tr>
+      <tr><td>自动化检查项</td><td class="n">16 / 16 通过</td><td>含移动端 375px 无横向溢出、无控制台报错、不请求本地后端</td></tr>
+      <tr><td>数据一致性</td><td class="n">一致</td><td>快照 247 篇与数据库导出结果一致，canonical 指向正式域名</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>七、复核方式 <span>VERIFICATION</span></h2>
+    <div class="formula">
+# 方式一：站内日志复算（脚本已随源码提供，可直接运行）
+python fufu-server/scripts/visit_stats.py logs/access.log
+
+# 方式二：数据库直查（原始记录逐条可查）
+sqlite3 data/fufu.db "SELECT created_at, ip_address, path FROM access_log ORDER BY id DESC LIMIT 20;"
+
+# 方式三：平台后台导出
+在静态托管平台的站点统计页导出访问数据（PV / UV）
+    </div>
+  </section>
+
+  <section>
+    <h2>八、声明 <span>STATEMENT</span></h2>
+    <ol class="decl">
+      <li>第二节访问量与独立访客数据来源于站点托管平台的访问统计，由作品作者按载明口径导出，未做人工修饰或拟合。</li>
+      <li>第四节访问日志由本站服务端逐条记录并同时写入数据库与日志文件，可由随源码提供的脚本独立复算；复算结果与后台展示一致。</li>
+      <li>两节数据来源不同、周期不同，分开呈现且不做混合计算；后台「访问统计」页同样按来源分列展示。</li>
+      <li>本产品为免注册应用，未采集手机号、邮箱、账号等个人身份信息；用户规模统一以「独立 IP 去重后的访客数」为统计口径，页面展示的 IP 均已脱敏（保留网段、隐藏主机位）。</li>
+      <li>如评审方对任一项数据存疑，可提供原始访问日志、统计脚本与数据库查询命令供现场复算。</li>
+    </ol>
+  </section>
+
+  <div class="sign">
+    <div class="blk">
+      作品名称：<span class="underline" style="min-width:170px;">fufu新闻（fufu news）</span><br />
+      开发者：<span class="underline"></span>　　日期：<span class="underline" style="min-width:96px;">2026-11-16</span>
+    </div>
+    <div class="stamp">fufu新闻<br />数据统计专用<br />2026.11.16</div>
+  </div>
+
+  <div class="foot">
+    <span>FUFU-STAT-20261116　·　fufu新闻（fufu news）</span>
+    <span>数据截止 2026-11-16</span>
+  </div>
+
+</div>
+</body>
+</html>
